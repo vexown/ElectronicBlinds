@@ -1,1 +1,0 @@
-# RemoteFinger application based on Raspberry Pico W running the FreeRTOS system
