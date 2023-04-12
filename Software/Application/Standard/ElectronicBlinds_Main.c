@@ -46,8 +46,8 @@
 #include "hardware/gpio.h"
 
 /* Priorities for the tasks */
-#define mainQUEUE_RECEIVE_TASK_PRIORITY		( tskIDLE_PRIORITY + 2 )
-#define	mainQUEUE_SEND_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
+#define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
+#define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )
 
 /* The rate at which data is sent to the queue. The rate is once every mainQUEUE_SEND_FREQUENCY_MS (once every 1000ms by default) */
 #define mainQUEUE_SEND_FREQUENCY_MS			( 1000 / portTICK_PERIOD_MS )
@@ -109,10 +109,10 @@ void ElectronicBlinds_Main( void )
 					"Rx", 								/* The text name assigned to the task - for debug only as it is not used by the kernel. */
 					configMINIMAL_STACK_SIZE, 			/* The size of the stack to allocate to the task. */
 					NULL, 								/* The parameter passed to the task - not used in this case. */
-					mainQUEUE_RECEIVE_TASK_PRIORITY, 	/* The priority assigned to the task. */
+					MOTOR_CONTROLLER_TASK_PRIORITY, 	/* The priority assigned to the task. */
 					NULL );								/* The task handle is not required, so NULL is passed. */
 
-		xTaskCreate( ButtonTask, "TX", configMINIMAL_STACK_SIZE, NULL, mainQUEUE_SEND_TASK_PRIORITY, NULL );
+		xTaskCreate( ButtonTask, "TX", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
 
 		/* Start the tasks and timer running. */
 		printf("RTOS configuration finished, starting the scheduler... \n");
