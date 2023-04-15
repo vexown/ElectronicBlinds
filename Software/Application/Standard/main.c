@@ -42,6 +42,10 @@
 #include "pico/stdlib.h"
 
 /*-----------------------------------------------------------*/
+#define BUTTON_UP 14U
+#define BUTTON_DOWN 15U
+#define SOURCE_3V3_1 12U
+#define SOURCE_3V3_2 13U
 
 /* Hardware setup function */
 static void prvSetupHardware( void );
@@ -71,9 +75,26 @@ int main( void )
 static void prvSetupHardware( void )
 {
     stdio_init_all();
+
     gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, 1);
-    gpio_put(PICO_DEFAULT_LED_PIN, !PICO_DEFAULT_LED_PIN_INVERTED);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+
+    gpio_init(SOURCE_3V3_1);
+    gpio_set_dir(SOURCE_3V3_1, GPIO_OUT);
+    gpio_put(SOURCE_3V3_1, 1);
+
+    gpio_init(SOURCE_3V3_2);
+    gpio_set_dir(SOURCE_3V3_2, GPIO_OUT);
+    gpio_put(SOURCE_3V3_2, 1);
+
+    gpio_init(BUTTON_UP);
+    gpio_set_dir(BUTTON_UP, GPIO_IN);
+    gpio_set_pulls(BUTTON_UP, false, true);
+
+    gpio_init(BUTTON_DOWN);
+    gpio_set_dir(BUTTON_DOWN, GPIO_IN);
+    gpio_set_pulls(BUTTON_DOWN, false, true);
 }
 /*-----------------------------------------------------------*/
 
