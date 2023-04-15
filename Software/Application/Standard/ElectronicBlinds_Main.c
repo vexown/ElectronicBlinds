@@ -49,8 +49,9 @@
 #define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
 #define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )
 
-/* The rate at which data is sent to the queue. The rate is once every mainQUEUE_SEND_FREQUENCY_MS (once every 1000ms by default) */
-#define mainQUEUE_SEND_FREQUENCY_MS			( 1000 / portTICK_PERIOD_MS )
+/* Task periods (ms) */
+#define BUTTON_TASK_PERIOD						( 100 )
+#define MOTOR_CONTROLLER_TASK_PERIOD			( 100 )
 
 /* The number of items the queue can hold */
 #define mainQUEUE_LENGTH					( 1 )
@@ -58,7 +59,11 @@
 /* By default the MPU6050 devices are on bus address 0x68 */ 
 #define MPU6050_I2C_ADDRESS   				 0x68
 
-#define BUTTON_PIN 19U
+#define BUTTON_UP 14U
+#define BUTTON_DOWN 15U
+
+#define CLOCKWISE 	  (1)
+#define ANTICLOCKWISE (-1)
 
 /*-----------------------------------------------------------*/
 
@@ -73,51 +78,54 @@ static void ButtonTask( void *pvParameters );
 
 /*-----------------------------------------------------------*/
 
-/* The queue instance */
-static QueueHandle_t xQueue = NULL;
+static int MotorDirection;
 
-/*-----------------------------------------------------------*/
+/* Semaphore instance for signaling the button press */
+SemaphoreHandle_t buttonSemaphore;
 
-// Declare a semaphore handle for signaling the button press
-SemaphoreHandle_t buttonSemaphore = NULL;
-
-void button_isr() {
+void buttonUp_isr() 
+{
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken);
+  if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+  {
+	MotorDirection = ANTICLOCKWISE;
+  }
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+void buttonDown_isr()
+{
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+  {
+	MotorDirection = CLOCKWISE;
+  }
   portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void ElectronicBlinds_Main( void )
 {
-	// Initialize the semaphore handle
+	/* Create a binary semaphore */
+	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive 
+	   functions to control access to the shared resource
+	*/
  	buttonSemaphore = xSemaphoreCreateBinary();
+	/* Start with semaphore count = 0 */
+	xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
 
-	// Initialize the button pin
-    gpio_init(BUTTON_PIN);
-    gpio_set_dir(BUTTON_PIN, GPIO_IN);
-    gpio_set_pulls(BUTTON_PIN, true, false);
-    gpio_set_irq_enabled_with_callback(BUTTON_PIN, GPIO_IRQ_EDGE_RISE, true, &button_isr);
+	/* Initialize the IRQs for the button pins */
+    gpio_set_irq_enabled_with_callback(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true, &buttonUp_isr);
+    gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttonDown_isr);
 
 	printf("Setting up the RTOS configuration... \n");
-    /* Create the queue. */
-	xQueue = xQueueCreate( mainQUEUE_LENGTH, sizeof( uint32_t ) );
 
-	if( xQueue != NULL )
-	{
-		/* Create the tasks */
-		xTaskCreate( MotorControllerTask,				/* The function that implements the task. */
-					"Rx", 								/* The text name assigned to the task - for debug only as it is not used by the kernel. */
-					configMINIMAL_STACK_SIZE, 			/* The size of the stack to allocate to the task. */
-					NULL, 								/* The parameter passed to the task - not used in this case. */
-					MOTOR_CONTROLLER_TASK_PRIORITY, 	/* The priority assigned to the task. */
-					NULL );								/* The task handle is not required, so NULL is passed. */
+	/* Create the tasks */
+	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
+	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
 
-		xTaskCreate( ButtonTask, "TX", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
-
-		/* Start the tasks and timer running. */
-		printf("RTOS configuration finished, starting the scheduler... \n");
-		vTaskStartScheduler();
-	}
+	/* Start the tasks and timer running. */
+	printf("RTOS configuration finished, starting the scheduler... \n");
+	vTaskStartScheduler();
 
 	/* If all is well, the scheduler will now be running, and the following
 	line will never be reached.  If the following line does execute, then
@@ -130,21 +138,40 @@ void ElectronicBlinds_Main( void )
 
 static void ButtonTask( void *pvParameters )
 {
+	TickType_t xTaskStartTime;
+	const TickType_t xTaskPeriod = pdMS_TO_TICKS(BUTTON_TASK_PERIOD);
+
+	xTaskStartTime = xTaskGetTickCount();
+
 	for( ;; )
 	{
-		if (xSemaphoreTake(buttonSemaphore, portMAX_DELAY) == pdTRUE) 
+		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
+		if ( SemaphoreObtained && (MotorDirection == ANTICLOCKWISE)) 
 		{
-		printf("Button pressed!\n");
+			gpio_put(PICO_DEFAULT_LED_PIN, 1);
+			printf("UP Button pressed!\n");
 		}
+		else if (SemaphoreObtained && (MotorDirection == CLOCKWISE)) 
+		{
+			gpio_put(PICO_DEFAULT_LED_PIN, 0);
+			printf("DOWN Button pressed!\n");
+		}
+
+		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
 	}
 }
 
 static void MotorControllerTask( void *pvParameters )
 {
+	TickType_t xTaskStartTime;
+	const TickType_t xTaskPeriod = pdMS_TO_TICKS(BUTTON_TASK_PERIOD);
+
+	xTaskStartTime = xTaskGetTickCount();
 
 	for( ;; )
 	{
 
+		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
 	}
 }
 
