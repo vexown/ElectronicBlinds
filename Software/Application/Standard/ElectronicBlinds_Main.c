@@ -78,44 +78,65 @@ static void ButtonTask( void *pvParameters );
 
 /*-----------------------------------------------------------*/
 
-static int MotorDirection;
+static int MotorDirection_Requested;
+static int MotorDirection_Current;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
 
-void buttonUp_isr() 
+void buttons_callback(uint gpio, uint32_t events)
 {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-  {
-	MotorDirection = ANTICLOCKWISE;
-  }
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
+	if(gpio == BUTTON_UP)
+	{
+		printf("UP Button pressed! \n");
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-void buttonDown_isr()
-{
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-  {
-	MotorDirection = CLOCKWISE;
-  }
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+		if(MotorDirection_Current == ANTICLOCKWISE)
+		{
+			return;
+		}
+
+		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+		{
+			printf("Semaphore Given by UP button\n");
+			MotorDirection_Requested = ANTICLOCKWISE;
+		}
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+	else if(gpio == BUTTON_DOWN)
+	{
+		printf("DOWN Button pressed! \n");
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+		if(MotorDirection_Current == CLOCKWISE)
+		{
+			return;
+		}
+
+		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+		{
+			printf("Semaphore Given by DOWN button \n");
+			MotorDirection_Requested = CLOCKWISE;
+		}
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
 }
 
 void ElectronicBlinds_Main( void )
 {
 	/* Create a binary semaphore */
-	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive 
-	   functions to control access to the shared resource
-	*/
+	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive functions to control access to the shared resource */
  	buttonSemaphore = xSemaphoreCreateBinary();
 	/* Start with semaphore count = 0 */
 	xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
 
-	/* Initialize the IRQs for the button pins */
-    gpio_set_irq_enabled_with_callback(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true, &buttonUp_isr);
-    gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttonDown_isr);
+	/* Enabled the IRQs for the button pins 
+	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
+	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttons_callback);
+	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
+	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
+    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
 
 	printf("Setting up the RTOS configuration... \n");
 
@@ -145,16 +166,19 @@ static void ButtonTask( void *pvParameters )
 
 	for( ;; )
 	{
+		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
 		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
-		if ( SemaphoreObtained && (MotorDirection == ANTICLOCKWISE)) 
+		if ( SemaphoreObtained && (MotorDirection_Requested == ANTICLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
+			MotorDirection_Current = MotorDirection_Requested;
 			gpio_put(PICO_DEFAULT_LED_PIN, 1);
-			printf("UP Button pressed!\n");
+			printf("Motor direction changed to ANTICLOCKWISE\n");
 		}
-		else if (SemaphoreObtained && (MotorDirection == CLOCKWISE)) 
+		else if (SemaphoreObtained && (MotorDirection_Requested == CLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
+			MotorDirection_Current = MotorDirection_Requested;
 			gpio_put(PICO_DEFAULT_LED_PIN, 0);
-			printf("DOWN Button pressed!\n");
+			printf("Motor direction changed to CLOCKWISE\n");
 		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
