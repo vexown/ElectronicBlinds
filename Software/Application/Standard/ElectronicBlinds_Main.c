@@ -44,26 +44,7 @@
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "hardware/gpio.h"
-
-/* Priorities for the tasks */
-#define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
-#define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )
-
-/* Task periods (ms) */
-#define BUTTON_TASK_PERIOD						( 100 )
-#define MOTOR_CONTROLLER_TASK_PERIOD			( 100 )
-
-/* The number of items the queue can hold */
-#define mainQUEUE_LENGTH					( 1 )
-
-/* By default the MPU6050 devices are on bus address 0x68 */ 
-#define MPU6050_I2C_ADDRESS   				 0x68
-
-#define BUTTON_UP 14U
-#define BUTTON_DOWN 15U
-
-#define CLOCKWISE 	  (1)
-#define ANTICLOCKWISE (-1)
+#include "ElectronicBlinds_Main.h"
 
 /*-----------------------------------------------------------*/
 
@@ -171,13 +152,18 @@ static void ButtonTask( void *pvParameters )
 		if ( SemaphoreObtained && (MotorDirection_Requested == ANTICLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
 			MotorDirection_Current = MotorDirection_Requested;
+
 			gpio_put(PICO_DEFAULT_LED_PIN, 1);
+			gpio_put(MOTOR_CONTROL_1, 1);
+			gpio_put(MOTOR_CONTROL_2, 0);
 			printf("Motor direction changed to ANTICLOCKWISE\n");
 		}
 		else if (SemaphoreObtained && (MotorDirection_Requested == CLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
 			MotorDirection_Current = MotorDirection_Requested;
 			gpio_put(PICO_DEFAULT_LED_PIN, 0);
+			gpio_put(MOTOR_CONTROL_1, 0);
+			gpio_put(MOTOR_CONTROL_2, 1);
 			printf("Motor direction changed to CLOCKWISE\n");
 		}
 
@@ -200,7 +186,7 @@ static void MotorControllerTask( void *pvParameters )
 }
 
 
-
+/* TO DO - ADD TURNING OFF MOTOR WHEN BUTTON IS RELEASED */
 
 
 

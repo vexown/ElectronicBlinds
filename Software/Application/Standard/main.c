@@ -40,12 +40,9 @@
 /* Library includes. */
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "ElectronicBlinds_Main.h"
 
 /*-----------------------------------------------------------*/
-#define BUTTON_UP 14U
-#define BUTTON_DOWN 15U
-#define SOURCE_3V3_1 12U
-#define SOURCE_3V3_2 13U
 
 /* Hardware setup function */
 static void prvSetupHardware( void );
@@ -95,6 +92,15 @@ static void prvSetupHardware( void )
     gpio_init(BUTTON_DOWN);
     gpio_set_dir(BUTTON_DOWN, GPIO_IN);
     gpio_set_pulls(BUTTON_DOWN, false, true);
+
+    gpio_init(MOTOR_CONTROL_1);
+    gpio_set_dir(MOTOR_CONTROL_1, GPIO_OUT);
+    gpio_put(MOTOR_CONTROL_1, 0);
+
+    gpio_init(MOTOR_CONTROL_2);
+    gpio_set_dir(MOTOR_CONTROL_2, GPIO_OUT);
+    gpio_put(MOTOR_CONTROL_2, 0);
+
 }
 /*-----------------------------------------------------------*/
 
