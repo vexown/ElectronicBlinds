@@ -56,26 +56,29 @@ void ElectronicBlinds_Main( void );
 /* Tasks declarations */
 static void MotorControllerTask( void *pvParameters );
 static void ButtonTask( void *pvParameters );
+static void InterruptControlTask( void *pvParameters );
 
 /*-----------------------------------------------------------*/
 
 static int MotorDirection_Requested;
 static int MotorDirection_Current;
+static int GPIO_InterruptEnable_Status;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
 
 void buttons_callback(uint gpio, uint32_t events)
 {
-	if(gpio == BUTTON_UP)
+	GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_DISABLED;
+	printf("INTERRUPTS DISABLED! \n");
+	/* After button press/release has been detelcted. Disable GPIO interrupts for some time (for button debouncing and better determinism of the system )*/ 
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
+    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+
+	if((gpio == BUTTON_UP) && (events == GPIO_IRQ_EDGE_RISE))
 	{
 		printf("UP Button pressed! \n");
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-		if(MotorDirection_Current == ANTICLOCKWISE)
-		{
-			return;
-		}
 
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
@@ -84,15 +87,10 @@ void buttons_callback(uint gpio, uint32_t events)
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
-	else if(gpio == BUTTON_DOWN)
+	else if((gpio == BUTTON_DOWN) && (events == GPIO_IRQ_EDGE_RISE))
 	{
 		printf("DOWN Button pressed! \n");
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-		if(MotorDirection_Current == CLOCKWISE)
-		{
-			return;
-		}
 
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
@@ -100,6 +98,18 @@ void buttons_callback(uint gpio, uint32_t events)
 			MotorDirection_Requested = CLOCKWISE;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+	}
+	else if(events == GPIO_IRQ_EDGE_FALL)
+	{
+		printf("Button released! \n");
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+		{
+			printf("Semaphore Given by button release \n");
+			MotorDirection_Requested = MOTOR_OFF;
+		}
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
 	}
 }
 
@@ -114,16 +124,18 @@ void ElectronicBlinds_Main( void )
 	/* Enabled the IRQs for the button pins 
 	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
 	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttons_callback);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
 	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
-    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_ENABLED;
 
 	printf("Setting up the RTOS configuration... \n");
 
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
 	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
+	xTaskCreate( InterruptControlTask, "InterruptControlTask", configMINIMAL_STACK_SIZE, NULL, INTERRUPT_CONTROL_TASK_PRIORITY, NULL );
 
 	/* Start the tasks and timer running. */
 	printf("RTOS configuration finished, starting the scheduler... \n");
@@ -166,6 +178,13 @@ static void ButtonTask( void *pvParameters )
 			gpio_put(MOTOR_CONTROL_2, 1);
 			printf("Motor direction changed to CLOCKWISE\n");
 		}
+		else if (SemaphoreObtained && (MotorDirection_Requested == MOTOR_OFF) && (MotorDirection_Current != MotorDirection_Requested)) 
+		{
+			MotorDirection_Current = MotorDirection_Requested;
+			gpio_put(MOTOR_CONTROL_1, 0);
+			gpio_put(MOTOR_CONTROL_2, 0);
+			printf("Motor OFF \n");
+		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
 	}
@@ -185,8 +204,33 @@ static void MotorControllerTask( void *pvParameters )
 	}
 }
 
+static void InterruptControlTask( void *pvParameters )
+{
+	TickType_t xTaskStartTime;
+	const TickType_t xTaskPeriod = pdMS_TO_TICKS(INTERRUPT_CONTROL_TASK_PERIOD);
 
-/* TO DO - ADD TURNING OFF MOTOR WHEN BUTTON IS RELEASED */
+	xTaskStartTime = xTaskGetTickCount();
+
+	for( ;; )
+	{
+		if(GPIO_InterruptEnable_Status == GPIO_INTERRUPTS_DISABLED)
+		{
+			/* Re-enable the interrupts */
+			printf("INTERRUPTS ENABLED! \n");
+			GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_ENABLED;
+			
+			gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
+   			gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+
+
+		}
+
+		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
+	}
+}
+
+
+/* TO DO - SPAM TESTING BUTTONS SHOWS SOME ISSUES - INVESTIGATE */
 
 
 
