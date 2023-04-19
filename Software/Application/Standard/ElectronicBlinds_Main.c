@@ -56,20 +56,17 @@ void ElectronicBlinds_Main( void );
 /* Tasks declarations */
 static void MotorControllerTask( void *pvParameters );
 static void ButtonTask( void *pvParameters );
-static void InterruptControlTask( void *pvParameters );
 
 /*-----------------------------------------------------------*/
 
 static int MotorDirection_Requested;
 static int MotorDirection_Current;
-static int GPIO_InterruptEnable_Status;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
 
 void buttons_callback(uint gpio, uint32_t events)
 {
-	GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_DISABLED;
 	printf("INTERRUPTS DISABLED! \n");
 	/* After button press/release has been detelcted. Disable GPIO interrupts for some time (for button debouncing and better determinism of the system )*/ 
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
@@ -128,14 +125,12 @@ void ElectronicBlinds_Main( void )
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
 	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
-	GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_ENABLED;
 
 	printf("Setting up the RTOS configuration... \n");
 
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
 	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
-	xTaskCreate( InterruptControlTask, "InterruptControlTask", configMINIMAL_STACK_SIZE, NULL, INTERRUPT_CONTROL_TASK_PRIORITY, NULL );
 
 	/* Start the tasks and timer running. */
 	printf("RTOS configuration finished, starting the scheduler... \n");
@@ -199,31 +194,6 @@ static void MotorControllerTask( void *pvParameters )
 
 	for( ;; )
 	{
-
-		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
-	}
-}
-
-static void InterruptControlTask( void *pvParameters )
-{
-	TickType_t xTaskStartTime;
-	const TickType_t xTaskPeriod = pdMS_TO_TICKS(INTERRUPT_CONTROL_TASK_PERIOD);
-
-	xTaskStartTime = xTaskGetTickCount();
-
-	for( ;; )
-	{
-		if(GPIO_InterruptEnable_Status == GPIO_INTERRUPTS_DISABLED)
-		{
-			/* Re-enable the interrupts */
-			printf("INTERRUPTS ENABLED! \n");
-			GPIO_InterruptEnable_Status = GPIO_INTERRUPTS_ENABLED;
-			
-			gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
-   			gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
-
-
-		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
 	}
