@@ -61,6 +61,7 @@ static void ButtonTask( void *pvParameters );
 
 static int MotorDirection_Requested;
 static int MotorDirection_Current;
+static uint32_t ExpectedEdgeDir;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
@@ -68,8 +69,8 @@ SemaphoreHandle_t buttonSemaphore;
 void buttons_callback(uint gpio, uint32_t events)
 {
 	/* Disable the interrupts */ 
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
-    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, false, &buttons_callback);
+    gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, false);
 
 	if((events & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 	{
@@ -103,10 +104,13 @@ void buttons_callback(uint gpio, uint32_t events)
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
+
+	/* After RISE event a FALL event is expected, and after FALL the next event should be RISE (since you PRESS and RELEASE the button) */
+	(ExpectedEdgeDir == GPIO_IRQ_EDGE_RISE) ? (ExpectedEdgeDir = GPIO_IRQ_EDGE_FALL) : (ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE);
 	
 	/* Re-enable the interrupts*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, true);
 }
 
 void ElectronicBlinds_Main( void )
@@ -120,10 +124,12 @@ void ElectronicBlinds_Main( void )
 	/* Enabled the IRQs for the button pins 
 	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
 	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttons_callback);
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
 	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
-    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
+	
+	ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
 
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
@@ -193,8 +199,6 @@ static void MotorControllerTask( void *pvParameters )
 	}
 }
 
-
-/* TO DO - SPAM TESTING BUTTONS SHOWS SOME ISSUES - INVESTIGATE */
 
 
 
