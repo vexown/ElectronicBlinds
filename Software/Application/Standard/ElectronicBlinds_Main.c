@@ -200,6 +200,16 @@ static void MotorControllerTask( void *pvParameters )
 }
 
 
-
+/** I have connected the controller to the motor, flashed this code and these are my observations:
+ *  - Burned the board (idk how, it was working at first but then the chip started getting hot and gg, maybe I accidentaly shorted smthing?)
+ * 		(or is there something fundementally wrong with my circuit?)
+ *  - I've noticed that turning the motor OFF after release was not really working if one of the buttons? Double check if this feature works correctly
+ *    (but maybe it stopped working after the short, I think it was fine at first idk...)
+ *  
+ * 	TODO:
+ * 		- Analyze the circuit to understand what went wrong
+ * 		- Order more Picos......
+ * 		- Try this with Arduino in the meantime? Just to see if it burns too lmao
+*/
 
 
