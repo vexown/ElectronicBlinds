@@ -213,7 +213,7 @@ static void MotorControllerTask( void *pvParameters )
  * 
  *  Updates - the adapter between the motor shaft and the Blinds shaft is spinning inside - make it stronger
  * 			- Tried it with arduino, it didn't burn but was able to spin just in 1 direction for some reason idk, tried it with power supply 3.3v and was getting correct voltages so controller is fine?
- * 			
+ * 			- Order new Picos, while I wait for them to get here - print the shaft adapter, re-test with arduino.
 */
 
 
