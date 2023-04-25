@@ -75,7 +75,7 @@ static void prvSetupHardware( void )
 
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 1);
+    gpio_put(PICO_DEFAULT_LED_PIN, 0);
 
     gpio_init(SOURCE_3V3_1);
     gpio_set_dir(SOURCE_3V3_1, GPIO_OUT);
