@@ -171,13 +171,14 @@ static void ButtonTask( void *pvParameters )
 		else if (SemaphoreObtained && (MotorDirection_Requested == CLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
 			MotorDirection_Current = MotorDirection_Requested;
-			gpio_put(PICO_DEFAULT_LED_PIN, 0);
+			gpio_put(PICO_DEFAULT_LED_PIN, 1);
 			gpio_put(MOTOR_CONTROL_1, 0);
 			gpio_put(MOTOR_CONTROL_2, 1);
 		}
 		else if (SemaphoreObtained && (MotorDirection_Requested == MOTOR_OFF) && (MotorDirection_Current != MotorDirection_Requested)) 
 		{
 			MotorDirection_Current = MotorDirection_Requested;
+			gpio_put(PICO_DEFAULT_LED_PIN, 0);
 			gpio_put(MOTOR_CONTROL_1, 0);
 			gpio_put(MOTOR_CONTROL_2, 0);
 		}
