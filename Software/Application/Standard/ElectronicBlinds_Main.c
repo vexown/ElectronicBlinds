@@ -45,19 +45,25 @@
 #include "pico/binary_info.h"
 #include "hardware/gpio.h"
 #include "ElectronicBlinds_Main.h"
+#include "hardware/timer.h"
 
-/*-----------------------------------------------------------*/
+/*----------------FUNCTION DECLARATION----------------------*/
 
 /* Main function called by main() from main.c (lol). This one does some setup and starts the scheduler */
 void ElectronicBlinds_Main( void );
 
-/*-----------------------------------------------------------*/
-
-/* Tasks declarations */
+/* Tasks  */
 static void MotorControllerTask( void *pvParameters );
 static void ButtonTask( void *pvParameters );
 
-/*-----------------------------------------------------------*/
+/* IRQ handlers  */
+void buttons_callback(uint gpio, uint32_t events);
+static void alarm_irq(void);
+
+/* Misc functions */
+static void alarm_in_us(uint32_t delay_us);
+
+/*---------------GLOBAL VARIABLES DECLARATION---------------*/
 
 static int MotorDirection_Requested;
 static int MotorDirection_Current;
@@ -66,16 +72,44 @@ static uint32_t ExpectedEdgeDir;
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
 
+static void alarm_irq(void) 
+{
+    /* Clear the alarm irq */
+    hw_clear_bits(&timer_hw->intr, 1u << ALARM_NUM);
+
+	/* After RISE event a FALL event is expected, and after FALL the next event should be RISE (since you PRESS and RELEASE the button) */
+	(ExpectedEdgeDir == GPIO_IRQ_EDGE_RISE) ? (ExpectedEdgeDir = GPIO_IRQ_EDGE_FALL) : (ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE);
+	
+	/* Re-enable the interrupts*/
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, true);
+}
+
+static void alarm_in_us(uint32_t delay_us) 
+{
+    /* Enable the interrupt for the alarm */
+    hw_set_bits(&timer_hw->inte, 1u << ALARM_NUM);
+    /*  Set irq handler for alarm irq and enable it*/
+    irq_set_exclusive_handler(ALARM_IRQ, alarm_irq);
+    irq_set_enabled(ALARM_IRQ, true);
+
+	/* Set the alarm time */
+    uint64_t target = timer_hw->timerawl + delay_us;
+    timer_hw->alarm[ALARM_NUM] = (uint32_t) target;
+}
+
 void buttons_callback(uint gpio, uint32_t events)
 {
 	/* Disable the interrupts */ 
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, false, &buttons_callback);
-    gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, false);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
+    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+
+	/* Set a timer for 50ms (for debouncing purposes) */
+	alarm_in_us(DEBOUNCING_DELAY_IN_US);
 
 	if((events & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 	{
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
 			MotorDirection_Requested = MOTOR_OFF;
@@ -86,7 +120,6 @@ void buttons_callback(uint gpio, uint32_t events)
 	{
 		
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
 			MotorDirection_Requested = ANTICLOCKWISE;
@@ -97,20 +130,12 @@ void buttons_callback(uint gpio, uint32_t events)
 	{
 		
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
 			MotorDirection_Requested = CLOCKWISE;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
-
-	/* After RISE event a FALL event is expected, and after FALL the next event should be RISE (since you PRESS and RELEASE the button) */
-	(ExpectedEdgeDir == GPIO_IRQ_EDGE_RISE) ? (ExpectedEdgeDir = GPIO_IRQ_EDGE_FALL) : (ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE);
-	
-	/* Re-enable the interrupts*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, true);
 }
 
 void ElectronicBlinds_Main( void )
@@ -157,7 +182,6 @@ static void ButtonTask( void *pvParameters )
 	for( ;; )
 	{
 		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
-		
 		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
 		
 		if ( SemaphoreObtained && (MotorDirection_Requested == ANTICLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
