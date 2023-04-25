@@ -208,13 +208,10 @@ static void MotorControllerTask( void *pvParameters )
  *    (but maybe it stopped working after the short, I think it was fine at first idk...)
  *  
  * 	TODO:
- * 		- Analyze the circuit to understand what went wrong
- * 		- Order more Picos......
- * 		- Try this with Arduino in the meantime? Just to see if it burns too lmao
+ * 		- Analyze the software to find why the buttons stick sometimes
  * 
- *  Updates - the adapter between the motor shaft and the Blinds shaft is spinning inside - make it stronger - (print in progress)
- * 			- Tried it with arduino, it didn't burn but was able to spin just in 1 direction for some reason idk, tried it with power supply 3.3v and was getting correct voltages so controller is fine? - Yes, confirmed fine
- * 			- Order new Picos, while I wait for them to get here - print the shaft adapter, re-test with arduino. - (retested, works perfectly fine with Arduino)
+ *  Updates - Printed a stronger shaft + used superglue so it has to stick now hehe.
+ * 			- Issue found with button control - sometimes the button "sticks", it doesn't turn off the motor on button release.
 */
 
 
