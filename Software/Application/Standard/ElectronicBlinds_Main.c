@@ -225,17 +225,12 @@ static void MotorControllerTask( void *pvParameters )
 }
 
 
-/** I have connected the controller to the motor, flashed this code and these are my observations:
- *  - Burned the board (idk how, it was working at first but then the chip started getting hot and gg, maybe I accidentaly shorted smthing?)
- * 		(or is there something fundementally wrong with my circuit?)
- *  - I've noticed that turning the motor OFF after release was not really working if one of the buttons? Double check if this feature works correctly
- *    (but maybe it stopped working after the short, I think it was fine at first idk...)
- *  
+/** 
  * 	TODO:
- * 		- Analyze the software to find why the buttons stick sometimes
+ * 		- Make a custom case for the device
  * 
- *  Updates - Printed a stronger shaft + used superglue so it has to stick now hehe.
- * 			- Issue found with button control - sometimes the button "sticks", it doesn't turn off the motor on button release.
+ *  Updates: 
+ * 		- Tested the whole system - works perfectly now 
 */
 
 
