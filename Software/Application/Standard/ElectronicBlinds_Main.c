@@ -227,10 +227,12 @@ static void MotorControllerTask( void *pvParameters )
 
 /** 
  * 	TODO:
- * 		- Make a custom case for the device
- * 
- *  Updates: 
- * 		- Tested the whole system - works perfectly now 
+ * 		- Add if pressed for 2,3 sec goes all the way up/down on its own (add top/bottom edge detection first)
+ * 		- Add OLED screen
+ * 		- Add brightness level detection
+ * 		- Add RTC and auto raise/lower at sunrise/sunset (maybe not necessary with brightness level detection?)
+ * 		- Press both buttons to activate/deactivate auto mode
+ * 		- Add bluetooth control? (maybe too much lol)
 */
 
 
