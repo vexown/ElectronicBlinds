@@ -68,6 +68,7 @@ static void alarm_in_us(uint32_t delay_us);
 static int MotorDirection_Requested;
 static int MotorDirection_Current;
 static uint32_t ExpectedEdgeDir;
+static uint32_t InterruptGPIO_NumberGlobal;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
@@ -79,6 +80,21 @@ static void alarm_irq(void)
 
 	/* After RISE event a FALL event is expected, and after FALL the next event should be RISE (since you PRESS and RELEASE the button) */
 	(ExpectedEdgeDir == GPIO_IRQ_EDGE_RISE) ? (ExpectedEdgeDir = GPIO_IRQ_EDGE_FALL) : (ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE);
+
+	// Read the state of the LED pin
+    bool is_high = gpio_get(InterruptGPIO_NumberGlobal);
+
+	if(!is_high)
+	{
+		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
+		{
+			MotorDirection_Requested = MOTOR_OFF;
+		}
+		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
+
+		ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
+	}
 	
 	/* Re-enable the interrupts*/
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, true, &buttons_callback);
@@ -105,8 +121,9 @@ void buttons_callback(uint gpio, uint32_t events)
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
 	/* Set a timer for 50ms (for debouncing purposes) */
+	InterruptGPIO_NumberGlobal = gpio;
 	alarm_in_us(DEBOUNCING_DELAY_IN_US);
-
+	
 	if((events & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 	{
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
