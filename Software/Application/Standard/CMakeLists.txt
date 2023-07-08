@@ -3,6 +3,7 @@ message("########## Application/Standard CMakeLists.txt - start ##########")
 add_executable(ElectronicBlinds_Main
         main.c
         ElectronicBlinds_Main.c
+        ButtonTask.c
         )
 
 target_compile_definitions(ElectronicBlinds_Main PRIVATE)

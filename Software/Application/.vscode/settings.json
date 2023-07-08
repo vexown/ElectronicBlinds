@@ -23,6 +23,7 @@
         "stdio.h": "c",
         "freertos.h": "c",
         "task.h": "c",
-        "semphr.h": "c"
+        "semphr.h": "c",
+        "buttontask.h": "c"
     }
 }
