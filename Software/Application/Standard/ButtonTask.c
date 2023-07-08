@@ -15,10 +15,10 @@
 
 #include "ButtonTask.h"
 
-static int MotorDirection_Requested;
-static int MotorDirection_Current;
+MotorState_t MotorState_Requested = STATE_OFF;
 static uint32_t ExpectedEdgeDir;
 static uint32_t InterruptGPIO_NumberGlobal;
+bool MotorStateChangeSemaphoreObtained = false;
 
 /* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
@@ -39,7 +39,7 @@ static void alarm_irq(void)
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
-			MotorDirection_Requested = MOTOR_OFF;
+			MotorState_Requested = STATE_OFF;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
 
@@ -79,7 +79,7 @@ void buttons_callback(uint gpio, uint32_t events)
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
-			MotorDirection_Requested = MOTOR_OFF;
+			MotorState_Requested = STATE_OFF;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
 	}
@@ -89,7 +89,7 @@ void buttons_callback(uint gpio, uint32_t events)
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
-			MotorDirection_Requested = ANTICLOCKWISE;
+			MotorState_Requested = STATE_ANTICLOCKWISE;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
@@ -99,7 +99,7 @@ void buttons_callback(uint gpio, uint32_t events)
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
 		{
-			MotorDirection_Requested = CLOCKWISE;
+			MotorState_Requested = STATE_CLOCKWISE;
 		}
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
@@ -118,8 +118,6 @@ void ButtonTask( void *pvParameters )
     /* Create a binary semaphore */
 	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive functions to control access to the shared resource */
  	buttonSemaphore = xSemaphoreCreateBinary();
-	/* Start with semaphore count = 0 */
-	xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
 
     ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
 
@@ -132,28 +130,9 @@ void ButtonTask( void *pvParameters )
 	{
 		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
 		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
-		
-		if ( SemaphoreObtained && (MotorDirection_Requested == ANTICLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
+		if (SemaphoreObtained) 
 		{
-			MotorDirection_Current = MotorDirection_Requested;
-
-			gpio_put(PICO_DEFAULT_LED_PIN, 1);
-			gpio_put(MOTOR_CONTROL_1, 1);
-			gpio_put(MOTOR_CONTROL_2, 0);
-		}
-		else if (SemaphoreObtained && (MotorDirection_Requested == CLOCKWISE) && (MotorDirection_Current != MotorDirection_Requested)) 
-		{
-			MotorDirection_Current = MotorDirection_Requested;
-			gpio_put(PICO_DEFAULT_LED_PIN, 1);
-			gpio_put(MOTOR_CONTROL_1, 0);
-			gpio_put(MOTOR_CONTROL_2, 1);
-		}
-		else if (SemaphoreObtained && (MotorDirection_Requested == MOTOR_OFF) && (MotorDirection_Current != MotorDirection_Requested)) 
-		{
-			MotorDirection_Current = MotorDirection_Requested;
-			gpio_put(PICO_DEFAULT_LED_PIN, 0);
-			gpio_put(MOTOR_CONTROL_1, 0);
-			gpio_put(MOTOR_CONTROL_2, 0);
+			MotorStateChangeSemaphoreObtained = true;
 		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);

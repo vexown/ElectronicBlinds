@@ -49,14 +49,12 @@
 
 /* Task includes */
 #include "ButtonTask.h"
+#include "MotorControllerTask.h"
 
 /*----------------FUNCTION DECLARATION----------------------*/
 
 /* Main function called by main() from main.c (lol). This one does some setup and starts the scheduler */
 void ElectronicBlinds_Main( void );
-
-/* Tasks  */
-static void MotorControllerTask( void *pvParameters );
 
 /*---------------GLOBAL VARIABLES DECLARATION---------------*/
 
@@ -77,22 +75,6 @@ void ElectronicBlinds_Main( void )
 	http://www.freertos.org/a00111.html. */
 	for( ;; );
 }
-
-
-
-static void MotorControllerTask( void *pvParameters )
-{
-	TickType_t xTaskStartTime;
-	const TickType_t xTaskPeriod = pdMS_TO_TICKS(BUTTON_TASK_PERIOD);
-
-	xTaskStartTime = xTaskGetTickCount();
-
-	for( ;; )
-	{
-		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
-	}
-}
-
 
 /** 
  * 	TODO:

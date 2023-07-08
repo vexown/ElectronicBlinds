@@ -24,6 +24,8 @@
         "freertos.h": "c",
         "task.h": "c",
         "semphr.h": "c",
-        "buttontask.h": "c"
+        "buttontask.h": "c",
+        "electronicblinds_main.h": "c",
+        "binary_info.h": "c"
     }
 }

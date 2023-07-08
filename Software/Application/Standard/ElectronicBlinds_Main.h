@@ -15,11 +15,6 @@
 /* By default the MPU6050 devices are on bus address 0x68 */ 
 #define MPU6050_I2C_ADDRESS   				 0x68
 
-/* Motor direction/state */
-#define CLOCKWISE 	  (1)
-#define ANTICLOCKWISE (-1)
-#define MOTOR_OFF (0)
-
 /* GPIO numbers */
 #define BUTTON_UP 14U
 #define BUTTON_DOWN 15U
