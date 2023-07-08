@@ -18,8 +18,12 @@
 /* GPIO numbers */
 #define BUTTON_UP 14U
 #define BUTTON_DOWN 15U
-#define SOURCE_3V3_1 12U
-#define SOURCE_3V3_2 13U
+#define BUTTON_TOP_LIMIT 8U
+#define BUTTON_BOTTOM_LIMIT 9U
+#define SOURCE_3V3_1 10U
+#define SOURCE_3V3_2 11U
+#define SOURCE_3V3_3 12U
+#define SOURCE_3V3_4 13U
 #define MOTOR_CONTROL_1 16U
 #define MOTOR_CONTROL_2 17U
 
