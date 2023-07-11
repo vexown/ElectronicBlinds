@@ -9,7 +9,7 @@
 
 /* Global Variables */
 extern MotorState_t MotorState_Requested;
-extern bool MotorStateChangeSemaphoreObtained;
+extern SemaphoreHandle_t buttonSemaphore;
 
 /* Function Declarations */
 void ButtonTask( void *pvParameters );

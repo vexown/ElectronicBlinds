@@ -15,40 +15,39 @@
 
 #include "ButtonTask.h"
 
-MotorState_t MotorState_Requested = STATE_OFF;
-static uint32_t ExpectedEdgeDir;
-static uint32_t InterruptGPIO_NumberGlobal;
-bool MotorStateChangeSemaphoreObtained = false;
+typedef struct
+{
+	uint32_t gpio;
+	uint32_t edge;
+}ButtonInfoType;
 
-/* Semaphore instance for signaling the button press */
+MotorState_t MotorState_Requested = STATE_OFF;
+volatile static bool ButtonUsed = false;
+static bool LimitReached = false;
 SemaphoreHandle_t buttonSemaphore;
+static ButtonInfoType ButtonInfo;
 
 static void alarm_irq(void) 
 {
     /* Clear the alarm irq */
     hw_clear_bits(&timer_hw->intr, 1u << ALARM_NUM);
 
-	/* After RISE event a FALL event is expected, and after FALL the next event should be RISE (since you PRESS and RELEASE the button) */
-	(ExpectedEdgeDir == GPIO_IRQ_EDGE_RISE) ? (ExpectedEdgeDir = GPIO_IRQ_EDGE_FALL) : (ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE);
-
-	// Read the state of the LED pin
-    bool is_high = gpio_get(InterruptGPIO_NumberGlobal);
-
+	/* Debouncing delay gives the button time to stabilize its' state. The below code handles a situation when the button is released 
+	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
+	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
+	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
+    bool is_high = gpio_get(ButtonInfo.gpio);
 	if(!is_high)
 	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_OFF;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
-
-		ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
+		ButtonUsed = true;
+		ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
 	}
 	
 	/* Re-enable the interrupts*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpectedEdgeDir, true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_UP, ExpectedEdgeDir, true);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 }
 
 static void alarm_in_us(uint32_t delay_us) 
@@ -69,40 +68,15 @@ void buttons_callback(uint gpio, uint32_t events)
 	/* Disable the interrupts */ 
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
-	/* Set a timer for 50ms (for debouncing purposes) */
-	InterruptGPIO_NumberGlobal = gpio;
+	ButtonUsed = true;
+	ButtonInfo.gpio = gpio;
+	ButtonInfo.edge = events;
+
+	/* Set a timer for 150ms debouncing delay - during that time interrupts are disabled - no button presses detected */
 	alarm_in_us(DEBOUNCING_DELAY_IN_US);
-	
-	if((events & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
-	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_OFF;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
-	}
-	else if((gpio == BUTTON_UP) && ((events & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE))
-	{
-		
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_ANTICLOCKWISE;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
-	else if((gpio == BUTTON_DOWN) && ((events & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE))
-	{
-		
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_CLOCKWISE;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
 }
 
 void ButtonTask( void *pvParameters )
@@ -114,12 +88,12 @@ void ButtonTask( void *pvParameters )
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
 	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
+	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE, true);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE, true);
     
     /* Create a binary semaphore */
 	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive functions to control access to the shared resource */
  	buttonSemaphore = xSemaphoreCreateBinary();
-
-    ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
 
 	TickType_t xTaskStartTime;
 	const TickType_t xTaskPeriod = pdMS_TO_TICKS(BUTTON_TASK_PERIOD);
@@ -128,11 +102,68 @@ void ButtonTask( void *pvParameters )
 
 	for( ;; )
 	{
-		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
-		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
-		if (SemaphoreObtained) 
+		if(ButtonUsed)
 		{
-			MotorStateChangeSemaphoreObtained = true;
+			/* If button pressed: (falling edge)*/
+			if((ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
+			{
+				switch (ButtonInfo.gpio)
+				{
+				case BUTTON_UP:
+				case BUTTON_DOWN:
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_OFF;
+					}
+					break;
+				
+				case BUTTON_TOP_LIMIT:
+				case BUTTON_BOTTOM_LIMIT:
+					printf("TOP LIMITTER RELEASED! \n");
+					LimitReached = false;
+					
+					break;
+				
+				default:
+					/* Do nothing */
+					break;
+				}
+			}
+			/* If button released: (rising edge)*/
+			else if((ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
+			{
+				switch (ButtonInfo.gpio)
+				{
+				case BUTTON_UP:
+					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!LimitReached))
+					{
+						MotorState_Requested = STATE_ANTICLOCKWISE;
+					}
+					break;
+				case BUTTON_DOWN:
+					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!LimitReached))
+					{
+						MotorState_Requested = STATE_CLOCKWISE;
+					}
+					break;
+				
+				case BUTTON_TOP_LIMIT:
+					printf("TOP LIMITTER HIT! \n");
+				case BUTTON_BOTTOM_LIMIT:
+					LimitReached = true;
+					
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_OFF;
+					}
+					break;
+				
+				default:
+					/* Do nothing */
+					break;
+				}
+			}
+			ButtonUsed = false;
 		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
