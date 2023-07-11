@@ -76,9 +76,11 @@ void MotorControllerTask( void *pvParameters )
 
 	for( ;; )
 	{
-        if((CurrentState != MotorState_Requested) && (MotorStateChangeSemaphoreObtained == true))
+
+		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
+		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
+        if((CurrentState != MotorState_Requested) && (SemaphoreObtained))
         {
-            MotorStateChangeSemaphoreObtained = false;
             stateMachine(MotorState_Requested);
         }
 

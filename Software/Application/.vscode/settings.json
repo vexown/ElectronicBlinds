@@ -26,6 +26,7 @@
         "semphr.h": "c",
         "buttontask.h": "c",
         "electronicblinds_main.h": "c",
-        "binary_info.h": "c"
+        "binary_info.h": "c",
+        "stdlib.h": "c"
     }
 }

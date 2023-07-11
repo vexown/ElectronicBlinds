@@ -15,13 +15,20 @@
 
 #include "ButtonTask.h"
 
+typedef struct
+{
+	uint32_t gpio;
+	uint32_t edge;
+}ButtonInfoType;
+
 MotorState_t MotorState_Requested = STATE_OFF;
 static uint32_t ExpectedEdgeDir;
+volatile static bool ButtonUsed = false;
 static uint32_t InterruptGPIO_NumberGlobal;
+static bool LimitReached = false;
 bool MotorStateChangeSemaphoreObtained = false;
-
-/* Semaphore instance for signaling the button press */
 SemaphoreHandle_t buttonSemaphore;
+static ButtonInfoType ButtonInfo;
 
 static void alarm_irq(void) 
 {
@@ -36,13 +43,7 @@ static void alarm_irq(void)
 
 	if(!is_high)
 	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_OFF;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
-
+		MotorState_Requested = STATE_OFF;
 		ExpectedEdgeDir = GPIO_IRQ_EDGE_RISE;
 	}
 	
@@ -69,40 +70,16 @@ void buttons_callback(uint gpio, uint32_t events)
 	/* Disable the interrupts */ 
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
 	/* Set a timer for 50ms (for debouncing purposes) */
 	InterruptGPIO_NumberGlobal = gpio;
 	alarm_in_us(DEBOUNCING_DELAY_IN_US);
-	
-	if((events & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
-	{
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_OFF;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);	
-	}
-	else if((gpio == BUTTON_UP) && ((events & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE))
-	{
-		
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_ANTICLOCKWISE;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
-	else if((gpio == BUTTON_DOWN) && ((events & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE))
-	{
-		
-		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		if(xSemaphoreGiveFromISR(buttonSemaphore, &xHigherPriorityTaskWoken) == pdTRUE)
-		{
-			MotorState_Requested = STATE_CLOCKWISE;
-		}
-		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-	}
+
+	ButtonUsed = true;
+	ButtonInfo.gpio = gpio;
+	ButtonInfo.edge = events;
 }
 
 void ButtonTask( void *pvParameters )
@@ -128,11 +105,64 @@ void ButtonTask( void *pvParameters )
 
 	for( ;; )
 	{
-		/* Attempt to obtain the semaphore - if not available task is blocked for xBlockTime (second arg) */
-		BaseType_t SemaphoreObtained = xSemaphoreTake(buttonSemaphore, portMAX_DELAY);
-		if (SemaphoreObtained) 
+		if(ButtonUsed)
 		{
-			MotorStateChangeSemaphoreObtained = true;
+			/* If button pressed: (rising edge)*/
+			if((ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
+			{
+				switch (ButtonInfo.gpio)
+				{
+				case BUTTON_UP:
+				case BUTTON_DOWN:
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_OFF;
+					}
+					break;
+				
+				case BUTTON_TOP_LIMIT:
+				case BUTTON_BOTTOM_LIMIT:
+					LimitReached = false;
+					break;
+				
+				default:
+					/* Do nothing */
+					break;
+				}
+			}
+			/* If button released: (falling edge)*/
+			else if((ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
+			{
+				switch (ButtonInfo.gpio)
+				{
+				case BUTTON_UP:
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_ANTICLOCKWISE;
+					}
+					break;
+				case BUTTON_DOWN:
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_CLOCKWISE;
+					}
+					break;
+				
+				case BUTTON_TOP_LIMIT:
+				case BUTTON_BOTTOM_LIMIT:
+					LimitReached = true;
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_OFF;
+					}
+					break;
+				
+				default:
+					/* Do nothing */
+					break;
+				}
+			}
+			ButtonUsed = false;
 		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
