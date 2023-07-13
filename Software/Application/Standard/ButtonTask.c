@@ -23,7 +23,8 @@ typedef struct
 
 MotorState_t MotorState_Requested = STATE_OFF;
 volatile static bool ButtonUsed = false;
-static bool LimitReached = false;
+static bool TopLimitReached = false;
+static bool BottomLimitReached = false;
 SemaphoreHandle_t buttonSemaphore;
 static ButtonInfoType ButtonInfo;
 
@@ -118,10 +119,11 @@ void ButtonTask( void *pvParameters )
 					break;
 				
 				case BUTTON_TOP_LIMIT:
+					TopLimitReached = false;
+					break;
+
 				case BUTTON_BOTTOM_LIMIT:
-					printf("TOP LIMITTER RELEASED! \n");
-					LimitReached = false;
-					
+					BottomLimitReached = false;
 					break;
 				
 				default:
@@ -135,22 +137,27 @@ void ButtonTask( void *pvParameters )
 				switch (ButtonInfo.gpio)
 				{
 				case BUTTON_UP:
-					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!LimitReached))
+					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
 					{
 						MotorState_Requested = STATE_ANTICLOCKWISE;
 					}
 					break;
 				case BUTTON_DOWN:
-					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!LimitReached))
+					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
 					{
 						MotorState_Requested = STATE_CLOCKWISE;
 					}
 					break;
 				
 				case BUTTON_TOP_LIMIT:
-					printf("TOP LIMITTER HIT! \n");
+					TopLimitReached = true;
+					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+					{
+						MotorState_Requested = STATE_OFF;
+					}
+
 				case BUTTON_BOTTOM_LIMIT:
-					LimitReached = true;
+					BottomLimitReached = true;
 					
 					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
 					{
