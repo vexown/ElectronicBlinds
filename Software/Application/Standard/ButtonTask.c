@@ -139,13 +139,13 @@ void ButtonTask( void *pvParameters )
 				case BUTTON_UP:
 					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
 					{
-						MotorState_Requested = STATE_ANTICLOCKWISE;
+						MotorState_Requested = STATE_CLOCKWISE;
 					}
 					break;
 				case BUTTON_DOWN:
 					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
 					{
-						MotorState_Requested = STATE_CLOCKWISE;
+						MotorState_Requested = STATE_ANTICLOCKWISE;
 					}
 					break;
 				
