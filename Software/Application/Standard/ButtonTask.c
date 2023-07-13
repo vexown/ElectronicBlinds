@@ -76,7 +76,7 @@ void buttons_callback(uint gpio, uint32_t events)
 	ButtonInfo.gpio = gpio;
 	ButtonInfo.edge = events;
 
-	/* Set a timer for 150ms debouncing delay - during that time interrupts are disabled - no button presses detected */
+	/* Set a timer for 100ms debouncing delay - during that time interrupts are disabled - no button presses detected */
 	alarm_in_us(DEBOUNCING_DELAY_IN_US);
 }
 
