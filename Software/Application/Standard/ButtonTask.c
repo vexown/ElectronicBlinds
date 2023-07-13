@@ -155,6 +155,7 @@ void ButtonTask( void *pvParameters )
 					{
 						MotorState_Requested = STATE_OFF;
 					}
+					break;
 
 				case BUTTON_BOTTOM_LIMIT:
 					BottomLimitReached = true;
