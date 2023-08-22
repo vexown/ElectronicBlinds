@@ -38,13 +38,15 @@ static void alarm_irq(void)
 	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
 	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
     bool is_high = gpio_get(ButtonInfo.gpio);
-	if(!is_high)
+	if(!is_high && !(ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
 	{
+		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
 		ButtonUsed = true;
 		ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
 	}
 	
 	/* Re-enable the interrupts*/
+	LOG("RE-ENABLE INTERRUPTS \n");
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
 	gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
 	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
@@ -66,7 +68,9 @@ static void alarm_in_us(uint32_t delay_us)
 
 void buttons_callback(uint gpio, uint32_t events)
 {
+	LOG("GPIO: %d, EVENT: %d \n", gpio, events);
 	/* Disable the interrupts */ 
+	LOG("DISABLE INTERRUPTS \n");
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
     gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
