@@ -19,14 +19,14 @@ typedef struct
 {
 	uint32_t gpio;
 	uint32_t edge;
+	bool pending;
 }ButtonInfoType;
 
 MotorState_t MotorState_Requested = STATE_OFF;
-volatile static bool ButtonUsed = false;
 static bool TopLimitReached = false;
 static bool BottomLimitReached = false;
 SemaphoreHandle_t buttonSemaphore;
-static ButtonInfoType ButtonInfo;
+static ButtonInfoType UpDown_ButtonInfo, Limitter_ButtonInfo;
 
 static void alarm0_InterruptHandler(void) 
 {
@@ -37,12 +37,12 @@ static void alarm0_InterruptHandler(void)
 	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
 	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
 	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
-    bool is_high = gpio_get(ButtonInfo.gpio);
-	if(!is_high && !(ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
+    bool is_high = gpio_get(UpDown_ButtonInfo.gpio);
+	if(!is_high && !(UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
 	{
 		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
-		ButtonUsed = true;
-		ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+		UpDown_ButtonInfo.pending = true;
+		UpDown_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
 	}
 	
 	/* Re-enable the interrupts*/
@@ -60,12 +60,12 @@ static void alarm1_InterruptHandler(void)
 	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
 	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
 	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
-    bool is_high = gpio_get(ButtonInfo.gpio);
-	if(!is_high && !(ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
+    bool is_high = gpio_get(Limitter_ButtonInfo.gpio);
+	if(!is_high && !(Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
 	{
 		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
-		ButtonUsed = true;
-		ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+		Limitter_ButtonInfo.pending = true;
+		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
 	}
 	
 	/* Re-enable the interrupts*/
@@ -108,6 +108,10 @@ void buttons_callback(uint gpio, uint32_t events)
 		gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
+		UpDown_ButtonInfo.pending = true;
+		UpDown_ButtonInfo.gpio = gpio;
+		UpDown_ButtonInfo.edge = events;
+
 		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
 		timerInit(DEBOUNCING_DELAY_IN_US, 0);
 	}
@@ -116,6 +120,10 @@ void buttons_callback(uint gpio, uint32_t events)
 		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
+		Limitter_ButtonInfo.pending = true;
+		Limitter_ButtonInfo.gpio = gpio;
+		Limitter_ButtonInfo.edge = events;
+
 		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
 		timerInit(DEBOUNCING_DELAY_IN_US, 1);
 	}
@@ -123,11 +131,6 @@ void buttons_callback(uint gpio, uint32_t events)
 	{
 		LOG("Button unknown - interrupts not disabled! \n");
 	}
-	
-	ButtonUsed = true;
-	ButtonInfo.gpio = gpio;
-	ButtonInfo.edge = events;
-
 }
 
 void ButtonTask( void *pvParameters )
@@ -153,81 +156,93 @@ void ButtonTask( void *pvParameters )
 
 	for( ;; )
 	{
-		if(ButtonUsed)
+		if(UpDown_ButtonInfo.pending)
 		{
 			/* If button pressed: (falling edge)*/
-			if((ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
+			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
-				switch (ButtonInfo.gpio)
+				switch (UpDown_ButtonInfo.gpio)
 				{
-				case BUTTON_UP:
-				case BUTTON_DOWN:
-					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
-					{
-						MotorState_Requested = STATE_OFF;
-					}
-					break;
-				
-				case BUTTON_TOP_LIMIT:
-					LOG("CLEAR OF THE TOP LIMIT! \n");
-					TopLimitReached = false;
-					break;
-
-				case BUTTON_BOTTOM_LIMIT:
-					LOG("CLEAR OF THE BOTTOM LIMIT! \n");
-					BottomLimitReached = false;
-					break;
-				
-				default:
-					/* Do nothing */
-					break;
+					case BUTTON_UP:
+					case BUTTON_DOWN:
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
+						break;
+					default: break;
 				}
 			}
 			/* If button released: (rising edge)*/
-			else if((ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
+			else if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
 			{
-				switch (ButtonInfo.gpio)
+				switch (UpDown_ButtonInfo.gpio)
 				{
-				case BUTTON_DOWN:
-					LOG("DOWN BUTTON PRESSED! \n");
-					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
-					{
-						MotorState_Requested = STATE_CLOCKWISE;
-					}
-					break;
-				case BUTTON_UP:
-					LOG("UP BUTTON PRESSED! \n");
-					if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
-					{
-						MotorState_Requested = STATE_ANTICLOCKWISE;
-					}
-					break;
-				
-				case BUTTON_TOP_LIMIT:
-					LOG("TOP LIMIT REACHED! \n");
-					TopLimitReached = true;
-					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
-					{
-						MotorState_Requested = STATE_OFF;
-					}
-					break;
-
-				case BUTTON_BOTTOM_LIMIT:
-					LOG("BOTTOM LIMIT REACHED! \n");
-					BottomLimitReached = true;
-					
-					if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
-					{
-						MotorState_Requested = STATE_OFF;
-					}
-					break;
-				
-				default:
-					/* Do nothing */
-					break;
+					case BUTTON_DOWN:
+						LOG("DOWN BUTTON PRESSED! \n");
+						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
+						{
+							MotorState_Requested = STATE_CLOCKWISE;
+						}
+						break;
+					case BUTTON_UP:
+						LOG("UP BUTTON PRESSED! \n");
+						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
+						{
+							MotorState_Requested = STATE_ANTICLOCKWISE;
+						}
+						break;
+					default: break;
 				}
 			}
-			ButtonUsed = false;
+			UpDown_ButtonInfo.pending = false;
+		}
+		if(Limitter_ButtonInfo.pending)
+		{
+			/* If button pressed: (falling edge)*/
+			if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
+			{
+				switch (Limitter_ButtonInfo.gpio)
+				{
+					case BUTTON_TOP_LIMIT:
+						LOG("CLEAR OF THE TOP LIMIT! \n");
+						TopLimitReached = false;
+						break;
+
+					case BUTTON_BOTTOM_LIMIT:
+						LOG("CLEAR OF THE BOTTOM LIMIT! \n");
+						BottomLimitReached = false;
+						break;
+					default: break;
+				}
+			}
+			/* If button released: (rising edge)*/
+			else if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
+			{
+				switch (Limitter_ButtonInfo.gpio)
+				{
+					case BUTTON_TOP_LIMIT:
+						LOG("TOP LIMIT REACHED! \n");
+						TopLimitReached = true;
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
+						break;
+
+					case BUTTON_BOTTOM_LIMIT:
+						LOG("BOTTOM LIMIT REACHED! \n");
+						BottomLimitReached = true;
+						
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
+						break;
+					default: break;
+				}
+			}
+			Limitter_ButtonInfo.pending = false;
 		}
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
@@ -237,10 +252,10 @@ void ButtonTask( void *pvParameters )
 /** 
  * 	TODO:
  * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state
- * 		- Bugfix - sometimes the DOWN direction is blocked even when bottom switch is unpressed (gets stuck in pressed state)
  * 		- Bugfix - bottom limitter works 99% of the time, but sometimes it still allows to go down - IMPORTANT FIX
  * 				   I've notice it happens when you: go down, hit the limitter, and then very quicky press down again
  * 		- Bugfix - if you hit a limitter and cycle the power, then the system doesnt know the limit switch is pressed since it works on interrupts
- * 		- Bugfix - sometimes the button press is detected as event 12 (both rising and falling edge), find a way to separate that 
+ * 		- Bugfix - sometimes the button press is detected as event 12 (both rising and falling edge), find a way to separate that, it messes up
+ * 			       the logic in some places coz for example events = 12 so which one should I detect it as, rising or falling? Figure that out
  * 
 */
