@@ -271,7 +271,5 @@ void ButtonTask( void *pvParameters )
  * 		- Bugfix - bottom limitter works 99% of the time, but sometimes it still allows to go down - IMPORTANT FIX
  * 				   I've notice it happens when you: go down, hit the limitter, and then very quicky press down again
  * 		- Bugfix - if you hit a limitter and cycle the power, then the system doesnt know the limit switch is pressed since it works on interrupts
- * 		- Bugfix - sometimes the button press is detected as event 12 (both rising and falling edge), find a way to separate that, it messes up
- * 			       the logic in some places coz for example events = 12 so which one should I detect it as, rising or falling? Figure that out
  * 
 */
