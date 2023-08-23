@@ -4,7 +4,7 @@
 #include "MotorControllerTask.h"
 
 /* Constants and Macros */
-#define PRINTS_ENABLED 1
+#define PRINTS_ENABLED 0
 
 #if(PRINTS_ENABLED == 1)
 #define LOG(...) printf(__VA_ARGS__)

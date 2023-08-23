@@ -272,5 +272,8 @@ void ButtonTask( void *pvParameters )
  * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state
  * 		- Bugfix - bottom limitter works 99% of the time, but sometimes it still allows to go down - IMPORTANT FIX
  * 				   I've notice it happens when you: go down, hit the limitter, and then very quicky press down again
+ * 		- Bugfix - IMPORTANT - in the latests software, sometime the whole system hangs - no prints visible - find out why
+ * 				   PERHAPS ITS JUST COZ OF TOO MANY PRINTS FOR THE RTOS, TEST WITH PRINTS DISABLED TO SEE IF ISSUE STILL EXISTS
+ * 				   REDUCE NUMBER OF PRINTS IF SO
  * 
 */
