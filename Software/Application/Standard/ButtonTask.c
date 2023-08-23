@@ -27,6 +27,7 @@ static bool TopLimitReached = false;
 static bool BottomLimitReached = false;
 SemaphoreHandle_t buttonSemaphore;
 static ButtonInfoType UpDown_ButtonInfo, Limitter_ButtonInfo;
+static uint32_t ExpctdEdges[4]; /* from 0 to 3: BUTTON_DOWN, BUTTON_UP, BUTTON_TOP_LIMIT, BUTTON_BOTTOM_LIMIT - TODO -this is temporary, change to smth more readable later */
 
 static void alarm0_InterruptHandler(void) 
 {
@@ -43,12 +44,14 @@ static void alarm0_InterruptHandler(void)
 		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
 		UpDown_ButtonInfo.pending = true;
 		UpDown_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+
+		(UpDown_ButtonInfo.gpio == BUTTON_DOWN) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
 	}
 	
 	/* Re-enable the interrupts*/
 	LOG("RE-ENABLE INTERRUPTS \n");
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
 }
 
 static void alarm1_InterruptHandler(void) 
@@ -66,12 +69,14 @@ static void alarm1_InterruptHandler(void)
 		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
 		Limitter_ButtonInfo.pending = true;
 		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+
+		(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
 	}
 	
 	/* Re-enable the interrupts*/
 	LOG("RE-ENABLE INTERRUPTS \n");
-	gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+	gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
 }
 
 static void timerInit(uint32_t delay_us, uint8_t timerNum)
@@ -112,6 +117,9 @@ void buttons_callback(uint gpio, uint32_t events)
 		UpDown_ButtonInfo.gpio = gpio;
 		UpDown_ButtonInfo.edge = events;
 
+		(gpio == BUTTON_DOWN && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
+		(gpio == BUTTON_UP && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
+
 		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
 		timerInit(DEBOUNCING_DELAY_IN_US, 0);
 	}
@@ -123,6 +131,9 @@ void buttons_callback(uint gpio, uint32_t events)
 		Limitter_ButtonInfo.pending = true;
 		Limitter_ButtonInfo.gpio = gpio;
 		Limitter_ButtonInfo.edge = events;
+
+		(gpio == BUTTON_TOP_LIMIT && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE);
+		(gpio == BUTTON_BOTTOM_LIMIT && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
 
 		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
 		timerInit(DEBOUNCING_DELAY_IN_US, 1);
@@ -138,13 +149,18 @@ void ButtonTask( void *pvParameters )
     /* Enabled the IRQs for the button pins 
 	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
 	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttons_callback);
+	gpio_get(BUTTON_DOWN) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
+	gpio_get(BUTTON_UP) ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
+	gpio_get(BUTTON_TOP_LIMIT) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE);
+	gpio_get(BUTTON_BOTTOM_LIMIT) ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
+
+	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
 	GPIO IRQ events for the current core (see inside the gpio_set_irq... function. There is a function gpio_set_irq_callback that doesnt care about the pin number*/
-    gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
-	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE, true);
-	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE, true);
-    
+	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
+	gpio_set_irq_enabled(BUTTON_TOP_LIMIT, ExpctdEdges[2], true);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+
     /* Create a binary semaphore */
 	/* Once created, a semaphore can be used with the xSemaphoreTake and xSemaphoreGive functions to control access to the shared resource */
  	buttonSemaphore = xSemaphoreCreateBinary();
