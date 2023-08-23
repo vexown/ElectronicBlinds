@@ -1,6 +1,8 @@
 #ifndef ELECTRONICBLINDS_MAIN_H
 #define ELECTRONICBLINDS_MAIN_H
 
+extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
+
 /* Priorities for the tasks */
 #define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
 #define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )

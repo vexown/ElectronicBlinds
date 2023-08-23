@@ -23,8 +23,7 @@ typedef struct
 }ButtonInfoType;
 
 MotorState_t MotorState_Requested = STATE_OFF;
-static bool TopLimitReached = false;
-static bool BottomLimitReached = false;
+static bool TopLimitReached, BottomLimitReached;
 SemaphoreHandle_t buttonSemaphore;
 static ButtonInfoType UpDown_ButtonInfo, Limitter_ButtonInfo;
 static uint32_t ExpctdEdges[4]; /* from 0 to 3: BUTTON_DOWN, BUTTON_UP, BUTTON_TOP_LIMIT, BUTTON_BOTTOM_LIMIT - TODO -this is temporary, change to smth more readable later */
@@ -149,10 +148,11 @@ void ButtonTask( void *pvParameters )
     /* Enabled the IRQs for the button pins 
 	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
 	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
-	gpio_get(BUTTON_DOWN) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
-	gpio_get(BUTTON_UP) ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
-	gpio_get(BUTTON_TOP_LIMIT) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE);
-	gpio_get(BUTTON_BOTTOM_LIMIT) ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
+
+	buttonDown_InitState ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
+	buttonUp_InitState ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
+	buttonTopLimit_InitState ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL, TopLimitReached = true) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE);
+	buttonBottomLimit_InitState ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL, BottomLimitReached = true) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
 
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
@@ -174,6 +174,8 @@ void ButtonTask( void *pvParameters )
 	{
 		if(UpDown_ButtonInfo.pending)
 		{
+			LOG("TOP LIMITTER STATUS: %d \n", TopLimitReached);
+			LOG("BOTTOM LIMITTER STATUS: %d \n", BottomLimitReached);
 			/* If button pressed: (falling edge)*/
 			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
@@ -270,6 +272,5 @@ void ButtonTask( void *pvParameters )
  * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state
  * 		- Bugfix - bottom limitter works 99% of the time, but sometimes it still allows to go down - IMPORTANT FIX
  * 				   I've notice it happens when you: go down, hit the limitter, and then very quicky press down again
- * 		- Bugfix - if you hit a limitter and cycle the power, then the system doesnt know the limit switch is pressed since it works on interrupts
  * 
 */
