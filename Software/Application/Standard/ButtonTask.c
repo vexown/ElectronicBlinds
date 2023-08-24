@@ -172,49 +172,8 @@ void ButtonTask( void *pvParameters )
 
 	for( ;; )
 	{
-		if(UpDown_ButtonInfo.pending)
-		{
-			LOG("TOP LIMITTER STATUS: %d \n", TopLimitReached);
-			LOG("BOTTOM LIMITTER STATUS: %d \n", BottomLimitReached);
-			/* If button pressed: (falling edge)*/
-			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
-			{
-				switch (UpDown_ButtonInfo.gpio)
-				{
-					case BUTTON_UP:
-					case BUTTON_DOWN:
-						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
-						{
-							MotorState_Requested = STATE_OFF;
-						}
-						break;
-					default: break;
-				}
-			}
-			/* If button released: (rising edge)*/
-			else if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
-			{
-				switch (UpDown_ButtonInfo.gpio)
-				{
-					case BUTTON_DOWN:
-						LOG("DOWN BUTTON PRESSED! \n");
-						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
-						{
-							MotorState_Requested = STATE_CLOCKWISE;
-						}
-						break;
-					case BUTTON_UP:
-						LOG("UP BUTTON PRESSED! \n");
-						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
-						{
-							MotorState_Requested = STATE_ANTICLOCKWISE;
-						}
-						break;
-					default: break;
-				}
-			}
-			UpDown_ButtonInfo.pending = false;
-		}
+		/* This if statement for the limit switches has to be executed first in this task, since there is only 1 semaphore to take for the state change,
+		   and limit switches shall have the priority to set the OFF State when limit is reached  */
 		if(Limitter_ButtonInfo.pending)
 		{
 			/* If button pressed: (falling edge)*/
@@ -263,18 +222,58 @@ void ButtonTask( void *pvParameters )
 			Limitter_ButtonInfo.pending = false;
 		}
 
+		if(UpDown_ButtonInfo.pending)
+		{
+			LOG("TOP LIMITTER STATUS: %d \n", TopLimitReached);
+			LOG("BOTTOM LIMITTER STATUS: %d \n", BottomLimitReached);
+			/* If button pressed: (falling edge)*/
+			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
+			{
+				switch (UpDown_ButtonInfo.gpio)
+				{
+					case BUTTON_UP:
+					case BUTTON_DOWN:
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
+						break;
+					default: break;
+				}
+			}
+			/* If button released: (rising edge)*/
+			else if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
+			{
+				switch (UpDown_ButtonInfo.gpio)
+				{
+					case BUTTON_DOWN:
+						LOG("DOWN BUTTON PRESSED! \n");
+						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
+						{
+							MotorState_Requested = STATE_CLOCKWISE;
+						}
+						break;
+					case BUTTON_UP:
+						LOG("UP BUTTON PRESSED! \n");
+						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
+						{
+							MotorState_Requested = STATE_ANTICLOCKWISE;
+						}
+						break;
+					default: break;
+				}
+			}
+			UpDown_ButtonInfo.pending = false;
+		}
+
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);
 	}
 }
 
 /** 
  * 	TODO:
- * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state
- * 		- Bugfix - bottom limitter works 99% of the time, but sometimes it still allows to go down - IMPORTANT FIX
- * 				   I've notice it happens when you: go down, hit the limitter, and then very quicky press down again
- * 		- Bugfix - in the latests software, sometime the whole system hangs - no prints visible - find out why
- * 				   PERHAPS ITS JUST COZ OF TOO MANY PRINTS FOR THE RTOS, TEST WITH PRINTS DISABLED TO SEE IF ISSUE STILL EXISTS
- * 				   REDUCE NUMBER OF PRINTS IF SO
+ * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state (possibly fixed when prints disabled but keep an eye)
  * 		- Bugfix - VERY IMPORTANT - ADD MORE IMMEDIATE REACTION FOR LIMITTERS COZ RIGHT NOW IM OVERSHOOTING BOTTOM AND RAMMING INTO TOP!
+ * 				 - POSSIBLE MECHANICAL SOLUTION - ADD SPRING AT THE TOP LIMITTER!
  * 
 */
