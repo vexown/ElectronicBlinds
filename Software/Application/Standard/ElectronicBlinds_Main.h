@@ -1,6 +1,8 @@
 #ifndef ELECTRONICBLINDS_MAIN_H
 #define ELECTRONICBLINDS_MAIN_H
 
+extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
+
 /* Priorities for the tasks */
 #define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
 #define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )
@@ -30,9 +32,6 @@
 /* Misc */
 #define GPIO_INTERRUPTS_ENABLED 1
 #define GPIO_INTERRUPTS_DISABLED 0
-
-#define ALARM_NUM 0
-#define ALARM_IRQ TIMER_IRQ_0
 
 #define DEBOUNCING_DELAY_IN_US 100000U //100ms
 

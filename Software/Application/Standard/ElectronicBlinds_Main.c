@@ -64,12 +64,38 @@ void vApplicationTickHook( void );
 
 
 /*---------------GLOBAL VARIABLES DECLARATION---------------*/
+bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
 
 void main( void )
 {
+    /* Startup delay - wait until the whole system is stabilized before starting */
+    sleep_ms(4000);
 
     /* Configure the Raspberry Pico hardware for blinky */
     prvSetupHardware();
+
+    /* Get initial pin states: */
+	uint8_t consistentReads;
+	/* Read each pin multiple times to get a stable result */
+	for(uint8_t i = 0; i < 100; i++ ){ 
+		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
+	}
+	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0;
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
+	}
+	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
+	}
+	buttonTopLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_BOTTOM_LIMIT) ? consistentReads++ : 0;
+	}
+	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
 
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
