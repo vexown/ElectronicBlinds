@@ -21,7 +21,7 @@ MotorState_t CurrentState = STATE_OFF;
 // State function implementations
 void stateOFF(void) 
 {
-    printf("In OFF state.\n");
+    printf("OFFst\n");
 
     gpio_put(PICO_DEFAULT_LED_PIN, 0);
     gpio_put(MOTOR_CONTROL_1, 0);
@@ -30,7 +30,7 @@ void stateOFF(void)
 
 void stateAnticlockwise(void) 
 {
-    printf("In state Anticlockwise.\n");
+    printf("aclkwise.\n");
 
     gpio_put(PICO_DEFAULT_LED_PIN, 1);
     gpio_put(MOTOR_CONTROL_1, 1);
@@ -39,7 +39,7 @@ void stateAnticlockwise(void)
 
 void stateClockwise(void) 
 {
-    printf("In state Clockwise.\n");
+    printf("clkwise\n");
 
     gpio_put(PICO_DEFAULT_LED_PIN, 1);
     gpio_put(MOTOR_CONTROL_1, 0);

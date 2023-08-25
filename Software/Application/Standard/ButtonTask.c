@@ -48,7 +48,7 @@ static void alarm0_InterruptHandler(void)
 	}
 	
 	/* Re-enable the interrupts*/
-	LOG("RE-ENABLE INTERRUPTS \n");
+	LOG("EI \n");
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
 	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
 }
@@ -77,7 +77,7 @@ static void alarm1_InterruptHandler(void)
 	{
 		ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
 		ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
-		LOG("RE-ENABLE INTERRUPTS \n");
+		LOG("EI1 \n");
 		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
 		gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
@@ -118,7 +118,7 @@ void buttons_callback(uint gpio, uint32_t events)
 {
 	LOG("GPIO: %d, EVENT: %d \n", gpio, events);
 	/* Disable the interrupts */ 
-	LOG("DISABLE INTERRUPTS \n");
+	LOG("DI \n");
 	if((gpio == BUTTON_DOWN) || (gpio == BUTTON_UP))
 	{
 		gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
@@ -246,8 +246,6 @@ void ButtonTask( void *pvParameters )
 
 		if(UpDown_ButtonInfo.pending)
 		{
-			LOG("TOP LIMITTER STATUS: %d \n", TopLimitReached);
-			LOG("BOTTOM LIMITTER STATUS: %d \n", BottomLimitReached);
 			/* If button pressed: (falling edge)*/
 			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
@@ -269,14 +267,14 @@ void ButtonTask( void *pvParameters )
 				switch (UpDown_ButtonInfo.gpio)
 				{
 					case BUTTON_DOWN:
-						LOG("DOWN BUTTON PRESSED! \n");
+						LOG("DBP! \n");
 						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
 						{
 							MotorState_Requested = STATE_CLOCKWISE;
 						}
 						break;
 					case BUTTON_UP:
-						LOG("UP BUTTON PRESSED! \n");
+						LOG("UBP! \n");
 						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
 						{
 							MotorState_Requested = STATE_ANTICLOCKWISE;
