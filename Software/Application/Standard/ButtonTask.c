@@ -57,37 +57,21 @@ static void alarm1_InterruptHandler(void)
 {
     /* Clear the alarm irq */
     hw_clear_bits(&timer_hw->intr, 1u << 1);
-
-	/* Debouncing delay gives the button time to stabilize its' state. The below code handles a situation when the button is released 
-	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
-	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
-	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
-    bool is_high = gpio_get(Limitter_ButtonInfo.gpio);
-	if(!is_high && !(Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
-	{
-		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
-		Limitter_ButtonInfo.pending = true;
-		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
-
-		(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
-	}
 	
+	/* It is assumed here, that when this timer goes off, the blinds have cleared the limit switch and are in the normal range of motion */
+	Limitter_ButtonInfo.pending = true;
+	Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
 	/* Re-enable the interrupts*/
-	if(Limitter_ButtonInfo.edge == GPIO_IRQ_EDGE_FALL)
-	{
-		ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
-		ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
-		LOG("EI1 \n");
-		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
-		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
-		gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
-		gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
-	}
-	else
-	{
-		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
-		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
-	}
+	ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
+	ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
+	ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE;
+	ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE;
+	LOG("EI1 \n");
+	gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
+	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+	gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
+	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
+
 }
 
 static void timerInit(uint32_t delay_us, uint8_t timerNum)
@@ -136,20 +120,25 @@ void buttons_callback(uint gpio, uint32_t events)
 	}
 	else if((gpio == BUTTON_BOTTOM_LIMIT) || (gpio == BUTTON_TOP_LIMIT))
 	{
-		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
-		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-		gpio_set_irq_enabled(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+		if(events == GPIO_IRQ_EDGE_RISE)
+		{
+			gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
+			gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+			gpio_set_irq_enabled(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+			gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
-		Limitter_ButtonInfo.pending = true;
-		Limitter_ButtonInfo.gpio = gpio;
-		Limitter_ButtonInfo.edge = events;
+			Limitter_ButtonInfo.pending = true;
+			Limitter_ButtonInfo.gpio = gpio;
+			Limitter_ButtonInfo.edge = events;
 
-		(gpio == BUTTON_TOP_LIMIT && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE);
-		(gpio == BUTTON_BOTTOM_LIMIT && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE);
-
-		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
-		timerInit(DEBOUNCING_DELAY_IN_US, 1);
+			/* Set a timer for reaction to hitting the limit switch - which is turn off all button interrupts, reverse the motor
+				and after the below delay, reenable interrupts and stop the motor (switch release is never detected, it is implied is was released)  */
+			timerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		}
+		else
+		{
+			LOG("INCORRECT LIMIT SWITCH EVENT!"); /* This should never happen */
+		}
 	}
 	else
 	{
@@ -246,6 +235,8 @@ void ButtonTask( void *pvParameters )
 
 		if(UpDown_ButtonInfo.pending)
 		{
+			LOG("TL%d \n", TopLimitReached);
+			LOG("BL%d \n", BottomLimitReached);
 			/* If button pressed: (falling edge)*/
 			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{

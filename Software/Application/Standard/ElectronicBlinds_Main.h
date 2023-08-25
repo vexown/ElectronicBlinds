@@ -34,5 +34,6 @@ extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, 
 #define GPIO_INTERRUPTS_DISABLED 0
 
 #define DEBOUNCING_DELAY_IN_US 100000U //100ms
+#define LIMIT_SWITCH_REACTION_DURATION_IN_US 500000 //500ms
 
 #endif /* ELECTRONICBLINDS_MAIN_H */
