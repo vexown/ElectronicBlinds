@@ -73,9 +73,21 @@ static void alarm1_InterruptHandler(void)
 	}
 	
 	/* Re-enable the interrupts*/
-	LOG("RE-ENABLE INTERRUPTS \n");
-	gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+	if(Limitter_ButtonInfo.edge == GPIO_IRQ_EDGE_FALL)
+	{
+		ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
+		ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
+		LOG("RE-ENABLE INTERRUPTS \n");
+		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
+		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+		gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
+		gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
+	}
+	else
+	{
+		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
+		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+	}
 }
 
 static void timerInit(uint32_t delay_us, uint8_t timerNum)
@@ -126,6 +138,8 @@ void buttons_callback(uint gpio, uint32_t events)
 	{
 		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+		gpio_set_irq_enabled(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
 		Limitter_ButtonInfo.pending = true;
 		Limitter_ButtonInfo.gpio = gpio;
