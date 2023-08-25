@@ -184,11 +184,19 @@ void ButtonTask( void *pvParameters )
 					case BUTTON_TOP_LIMIT:
 						LOG("CLEAR OF THE TOP LIMIT! \n");
 						TopLimitReached = false;
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
 						break;
 
 					case BUTTON_BOTTOM_LIMIT:
 						LOG("CLEAR OF THE BOTTOM LIMIT! \n");
 						BottomLimitReached = false;
+						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
+						{
+							MotorState_Requested = STATE_OFF;
+						}
 						break;
 					default: break;
 				}
@@ -203,7 +211,7 @@ void ButtonTask( void *pvParameters )
 						TopLimitReached = true;
 						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
 						{
-							MotorState_Requested = STATE_OFF;
+							MotorState_Requested = STATE_CLOCKWISE;
 						}
 						break;
 
@@ -213,7 +221,7 @@ void ButtonTask( void *pvParameters )
 						
 						if(xSemaphoreGive(buttonSemaphore) == pdTRUE)
 						{
-							MotorState_Requested = STATE_OFF;
+							MotorState_Requested = STATE_ANTICLOCKWISE;
 						}
 						break;
 					default: break;
