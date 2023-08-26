@@ -6,10 +6,12 @@ extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, 
 /* Priorities for the tasks */
 #define MOTOR_CONTROLLER_TASK_PRIORITY		( tskIDLE_PRIORITY + 1 )
 #define	BUTTON_TASK_PRIORITY				( tskIDLE_PRIORITY + 2 )
+#define AUTOMATIC_CONTROL_TASK_PRIORITY     ( tskIDLE_PRIORITY + 3 )
 
 /* Task periods (ms) */
 #define BUTTON_TASK_PERIOD						( 100 )
 #define MOTOR_CONTROLLER_TASK_PERIOD			( 100 )
+#define AUTOMATIC_CONTROL_TASK_PERIOD           ( 50000 )
 
 /* The number of items the queue can hold */
 #define mainQUEUE_LENGTH					( 1 )

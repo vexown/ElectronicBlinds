@@ -4,9 +4,12 @@ add_executable(ElectronicBlinds_Main
         ElectronicBlinds_Main.c
         ButtonTask.c
         MotorControllerTask.c
+        AutomaticControlTask.c
         )
 
-target_compile_definitions(ElectronicBlinds_Main PRIVATE)
+if (DEFINED CMAKE_SPECIAL_BUILD_FOR_SETTING_DATE)
+        add_compile_definitions(SPECIAL_BUILD_FOR_SETTING_DATE=1)
+endif ()
 
 target_include_directories(ElectronicBlinds_Main PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}

@@ -50,6 +50,11 @@
 /* Task includes */
 #include "ButtonTask.h"
 #include "MotorControllerTask.h"
+#include "AutomaticControlTask.h"
+
+/* Includes from the DS1307 library */
+#include "DS1307.h"
+#include "I2C_Driver.h"
 
 /* Hardware setup function */
 static void prvSetupHardware( void );
@@ -97,9 +102,22 @@ void main( void )
 	}
 	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
 
+	/* Reset the I2C0 controller to get a fresh clear state */
+	Reset_I2C0();
+    /* Initial Configuration of the I2C0 */
+    I2C_Initialize(I2C_FAST_MODE);
+
+	(void)setupPinsI2C0();
+	(void)Disable_DS1307_SquareWaveOutput();
+	(void)Enable_DS1307_Oscillator();
+#if (SPECIAL_BUILD_FOR_SETTING_DATE == 1)
+	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ );
+#endif
+
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
 	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
+    xTaskCreate( AutomaticControlTask, "AutomaticControlTask", configMINIMAL_STACK_SIZE, NULL, AUTOMATIC_CONTROL_TASK_PRIORITY, NULL );
 
 	/* Start the tasks and timer running. */
 	vTaskStartScheduler();
