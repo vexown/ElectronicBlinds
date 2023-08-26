@@ -28,6 +28,7 @@
         "electronicblinds_main.h": "c",
         "binary_info.h": "c",
         "stdlib.h": "c",
-        "motorcontrollertask.h": "c"
+        "motorcontrollertask.h": "c",
+        "gpio.h": "c"
     }
 }

@@ -1,0 +1,3 @@
+[submodule "Software/Pico_DS1307_HAL"]
+	path = Software/Pico_DS1307_HAL
+	url = https://github.com/vexown/Pico_DS1307_HAL.git
