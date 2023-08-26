@@ -14,6 +14,9 @@
 #include "hardware/timer.h"
 
 #include "ButtonTask.h"
+/* Includes from the DS1307 library */
+#include "DS1307.h"
+#include "I2C_Driver.h"
 
 typedef struct
 {
