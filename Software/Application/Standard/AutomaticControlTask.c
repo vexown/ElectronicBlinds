@@ -37,14 +37,14 @@ void AutomaticControlTask( void *pvParameters )
         printf("hour:%x minute:%x isClosed:%d \n", hour, minute, isClosed);
         if(((hour >= 21 && hour <= 23) || (hour >= 0 && hour < 9)) && (isClosed == 0)) /* Close the blinds after 9PM */
         {
-            gpio_put(MOTOR_CONTROL_1, 0);
-            gpio_put(MOTOR_CONTROL_2, 1);
+            gpio_put(MOTOR_CONTROL_1, 1);
+            gpio_put(MOTOR_CONTROL_2, 0);            
             I2C_Register_Write(8,1);
         }
         else if((hour >= 0x09 && hour < 0x21) && (isClosed == 1)) /* Open the blinds after 9AM */
         {
-            gpio_put(MOTOR_CONTROL_1, 1);
-            gpio_put(MOTOR_CONTROL_2, 0);
+            gpio_put(MOTOR_CONTROL_1, 0);
+            gpio_put(MOTOR_CONTROL_2, 1);
             I2C_Register_Write(8,0);
         }
 
