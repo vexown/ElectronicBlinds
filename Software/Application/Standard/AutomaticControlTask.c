@@ -35,7 +35,7 @@ void AutomaticControlTask( void *pvParameters )
         uint8_t minute = I2C_Register_Read(1);
         uint8_t isClosed = I2C_Register_Read(8);
         printf("hour:%x minute:%x isClosed:%d \n", hour, minute, isClosed);
-        if(((hour >= 21 && hour <= 23) || (hour >= 0 && hour < 9)) && (isClosed == 1)) /* Close the blinds after 9PM */
+        if(((hour >= 21 && hour <= 23) || (hour >= 0 && hour < 9)) && (isClosed == 0)) /* Close the blinds after 9PM */
         {
             gpio_put(MOTOR_CONTROL_1, 0);
             gpio_put(MOTOR_CONTROL_2, 1);
