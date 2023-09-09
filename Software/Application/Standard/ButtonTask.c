@@ -38,12 +38,12 @@ static void alarm0_InterruptHandler(void)
 
 	/* Debouncing delay gives the button time to stabilize its' state. The below code handles a situation when the button is released 
 	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
-	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
+	   of such press, the rising edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
 	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
     bool is_high = gpio_get(UpDown_ButtonInfo.gpio);
 	if(is_high && !(UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE))
 	{
-		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
+		LOG("BUTTON CHANGED TO HIGH DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
 		UpDown_ButtonInfo.pending = true;
 		UpDown_ButtonInfo.edge = GPIO_IRQ_EDGE_RISE;
 
@@ -155,10 +155,10 @@ void ButtonTask( void *pvParameters )
 	In Raspberry Pi Pico, only one callback function can be used for GPIO interrupts, even if multiple pins are used. 
 	This is because the interrupts are handled at the hardware level and there is only one interrupt handler for all the GPIO pins.*/
 
-	buttonDown_InitState ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL);
-	buttonUp_InitState ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL);
-	buttonTopLimit_InitState ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL, TopLimitReached = true);
-	buttonBottomLimit_InitState ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL, BottomLimitReached = true);
+	buttonDown_InitState ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
+	buttonUp_InitState ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
+	buttonTopLimit_InitState ? (ExpctdEdges[2] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE, TopLimitReached = true);
+	buttonBottomLimit_InitState ? (ExpctdEdges[3] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE, BottomLimitReached = true);
 
 	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
 	/* For the second and the concurrent GPIOs we dont have to specify the callback - the first GPIO already set the generic callback used for 
@@ -182,7 +182,7 @@ void ButtonTask( void *pvParameters )
 		   and limit switches shall have the priority to set the OFF State when limit is reached  */
 		if(Limitter_ButtonInfo.pending)
 		{
-			/* If button pressed: (falling edge)*/
+			/* If button released: (rising edge)*/
 			if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
 			{
 				switch (Limitter_ButtonInfo.gpio)
@@ -207,7 +207,7 @@ void ButtonTask( void *pvParameters )
 					default: break;
 				}
 			}
-			/* If button released: (rising edge)*/
+			/* If button pressed: (falling edge)*/
 			else if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
 				switch (Limitter_ButtonInfo.gpio)
@@ -286,8 +286,5 @@ void ButtonTask( void *pvParameters )
 
 /** 
  * 	TODO:
- * 		- Bugfix - when hits the bottom limitter, and then u press UP button, it gets stuck in UP state (possibly fixed when prints disabled but keep an eye)
- * 		- Bugfix - VERY IMPORTANT - ADD MORE IMMEDIATE REACTION FOR LIMITTERS COZ RIGHT NOW IM OVERSHOOTING BOTTOM AND RAMMING INTO TOP!
- * 				 - POSSIBLE MECHANICAL SOLUTION - ADD SPRING AT THE TOP LIMITTER!
  * 
 */
