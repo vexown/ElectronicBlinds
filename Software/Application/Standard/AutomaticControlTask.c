@@ -20,8 +20,6 @@
 #include "DS1307.h"
 #include "I2C_Driver.h"
 
-static bool isClosed;
-
 void AutomaticControlTask( void *pvParameters )
 {
 	TickType_t xTaskStartTime;
@@ -31,22 +29,23 @@ void AutomaticControlTask( void *pvParameters )
 
 	for( ;; )
 	{
-        
         /* I2C Register Read is set up to read from the DS1307 RTC module. You provide the register you want to read as argument 
             0 - seconds (all values in BDC), 1 - mins, 2 - hours, 3 - unused, 4 - DD, 5 - MM, 6 - YY */
-        uint8_t tempI2CreadVal = I2C_Register_Read(2);
-        printf("hour:%x \n", tempI2CreadVal);
-        if(tempI2CreadVal >= 0x21 && isClosed == false) /* Close the blinds after 9PM */
+        uint8_t hour = I2C_Register_Read(2);
+        uint8_t minute = I2C_Register_Read(1);
+        uint8_t isClosed = I2C_Register_Read(8);
+        printf("hour:%x minute:%x isClosed:%d \n", hour, minute, isClosed);
+        if(((hour >= 0x19 && hour <= 0x23) || (hour >= 0x0 && hour < 0x7)) && (isClosed == 0)) /* Close the blinds after 7PM */
+        {
+            gpio_put(MOTOR_CONTROL_1, 1);
+            gpio_put(MOTOR_CONTROL_2, 0);            
+            I2C_Register_Write(8,1);
+        }
+        else if((hour >= 0x07 && hour < 0x19) && (isClosed == 1)) /* Open the blinds after 7AM */
         {
             gpio_put(MOTOR_CONTROL_1, 0);
             gpio_put(MOTOR_CONTROL_2, 1);
-            isClosed = true;
-        }
-        else if(tempI2CreadVal >= 0x09 && tempI2CreadVal < 0x21 && isClosed == true) /* Open the blinds after 9AM */
-        {
-            gpio_put(MOTOR_CONTROL_1, 1);
-            gpio_put(MOTOR_CONTROL_2, 0);
-            isClosed = false;
+            I2C_Register_Write(8,0);
         }
 
 		vTaskDelayUntil(&xTaskStartTime, xTaskPeriod);

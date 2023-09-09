@@ -31,10 +31,9 @@ void stateOFF(void)
 void stateAnticlockwise(void) 
 {
     printf("aclkwise.\n");
-
     gpio_put(PICO_DEFAULT_LED_PIN, 1);
-    gpio_put(MOTOR_CONTROL_1, 1);
-    gpio_put(MOTOR_CONTROL_2, 0);
+    gpio_put(MOTOR_CONTROL_1, 0);
+    gpio_put(MOTOR_CONTROL_2, 1);
 }
 
 void stateClockwise(void) 
@@ -42,8 +41,8 @@ void stateClockwise(void)
     printf("clkwise\n");
 
     gpio_put(PICO_DEFAULT_LED_PIN, 1);
-    gpio_put(MOTOR_CONTROL_1, 0);
-    gpio_put(MOTOR_CONTROL_2, 1);
+    gpio_put(MOTOR_CONTROL_1, 1);
+    gpio_put(MOTOR_CONTROL_2, 0);
 }
 
 // State machine function

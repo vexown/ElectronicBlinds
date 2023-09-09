@@ -86,21 +86,25 @@ void main( void )
 		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
 	}
 	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0;
+    LOG("buttonDown_InitState = %d \n", buttonDown_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
 	}
 	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
+    LOG("buttonUp_InitState = %d \n", buttonUp_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
 	}
 	buttonTopLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+    LOG("buttonTopLimit_InitState = %d \n", buttonTopLimit_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_BOTTOM_LIMIT) ? consistentReads++ : 0;
 	}
 	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+    LOG("buttonBottomLimit_InitState = %d \n", buttonBottomLimit_InitState);
 
 	/* Reset the I2C0 controller to get a fresh clear state */
 	Reset_I2C0();
@@ -113,6 +117,19 @@ void main( void )
 #if (SPECIAL_BUILD_FOR_SETTING_DATE == 1)
 	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ );
 #endif
+
+/*
+    while (1) 
+    {
+		printf("Going into I2C reg read... \n");
+		for(int i = 0; i<=7; i++)
+		{
+			printf("Read reg %x = 0x%x \n", i, I2C_Register_Read(i));
+		}
+		sleep_ms(1000);
+        printf("/n");
+    }
+*/
 
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
@@ -143,36 +160,36 @@ static void prvSetupHardware( void )
 
     gpio_init(SOURCE_3V3_1);
     gpio_set_dir(SOURCE_3V3_1, GPIO_OUT);
-    gpio_put(SOURCE_3V3_1, 1);
+    gpio_put(SOURCE_3V3_1, 0);
 
     gpio_init(SOURCE_3V3_2);
     gpio_set_dir(SOURCE_3V3_2, GPIO_OUT);
-    gpio_put(SOURCE_3V3_2, 1);
+    gpio_put(SOURCE_3V3_2, 0);
 
 	gpio_init(SOURCE_3V3_3);
     gpio_set_dir(SOURCE_3V3_3, GPIO_OUT);
-    gpio_put(SOURCE_3V3_3, 1);
+    gpio_put(SOURCE_3V3_3, 0);
 
     gpio_init(SOURCE_3V3_4);
     gpio_set_dir(SOURCE_3V3_4, GPIO_OUT);
-    gpio_put(SOURCE_3V3_4, 1);
+    gpio_put(SOURCE_3V3_4, 0);
 
     gpio_init(BUTTON_UP);
     gpio_set_dir(BUTTON_UP, GPIO_IN);
-    gpio_set_pulls(BUTTON_UP, false, true);
+    gpio_set_pulls(BUTTON_UP, true, false);
 
     gpio_init(BUTTON_DOWN);
     gpio_set_dir(BUTTON_DOWN, GPIO_IN);
-    gpio_set_pulls(BUTTON_DOWN, false, true);
+    gpio_set_pulls(BUTTON_DOWN, true, false);
 
 	gpio_init(BUTTON_TOP_LIMIT);
     gpio_set_dir(BUTTON_TOP_LIMIT, GPIO_IN);
-    gpio_set_pulls(BUTTON_TOP_LIMIT, false, true);
+    gpio_set_pulls(BUTTON_TOP_LIMIT, true, false);
 
     gpio_init(BUTTON_BOTTOM_LIMIT);
     gpio_set_dir(BUTTON_BOTTOM_LIMIT, GPIO_IN);
-    gpio_set_pulls(BUTTON_BOTTOM_LIMIT, false, true);
-
+    gpio_set_pulls(BUTTON_BOTTOM_LIMIT, true, false);
+    
     gpio_init(MOTOR_CONTROL_1);
     gpio_set_dir(MOTOR_CONTROL_1, GPIO_OUT);
     gpio_put(MOTOR_CONTROL_1, 0);
