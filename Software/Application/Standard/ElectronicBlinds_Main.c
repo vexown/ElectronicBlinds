@@ -114,19 +114,6 @@ void main( void )
 	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ );
 #endif
 
-/*
-    while (1) 
-    {
-		printf("Going into I2C reg read... \n");
-		for(int i = 0; i<=7; i++)
-		{
-			printf("Read reg %x = 0x%x \n", i, I2C_Register_Read(i));
-		}
-		sleep_ms(1000);
-        printf("/n");
-    }
-*/
-
 	/* Create the tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
 	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
