@@ -86,25 +86,21 @@ void main( void )
 		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
 	}
 	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0;
-    LOG("buttonDown_InitState = %d \n", buttonDown_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
 	}
 	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
-    LOG("buttonUp_InitState = %d \n", buttonUp_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
 	}
 	buttonTopLimit_InitState = (consistentReads >= 70) ? 1 : 0;
-    LOG("buttonTopLimit_InitState = %d \n", buttonTopLimit_InitState);
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_BOTTOM_LIMIT) ? consistentReads++ : 0;
 	}
 	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
-    LOG("buttonBottomLimit_InitState = %d \n", buttonBottomLimit_InitState);
 
 	/* Reset the I2C0 controller to get a fresh clear state */
 	Reset_I2C0();
