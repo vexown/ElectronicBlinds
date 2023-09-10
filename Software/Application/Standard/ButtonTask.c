@@ -31,23 +31,46 @@ SemaphoreHandle_t buttonSemaphore;
 static ButtonInfoType UpDown_ButtonInfo, Limitter_ButtonInfo;
 static uint32_t ExpctdEdges[4]; /* from 0 to 3: BUTTON_DOWN, BUTTON_UP, BUTTON_TOP_LIMIT, BUTTON_BOTTOM_LIMIT - TODO -this is temporary, change to smth more readable later */
 
+static void timerInit(uint32_t delay_us, uint8_t timerNum)
+{
+    hw_set_bits(&timer_hw->inte, 1u << timerNum);
+
+	if(timerNum == 0)
+	{
+    	irq_set_exclusive_handler(TIMER_IRQ_0, alarm0_InterruptHandler);
+		irq_set_enabled(TIMER_IRQ_0, true);
+	}
+	else if(timerNum == 1)
+	{
+    	irq_set_exclusive_handler(TIMER_IRQ_1, alarm1_InterruptHandler);
+		irq_set_enabled(TIMER_IRQ_1, true);
+	}
+	else if(timerNum == 2)
+	{
+		irq_set_exclusive_handler(TIMER_IRQ_2, alarm2_InterruptHandler);
+		irq_set_enabled(TIMER_IRQ_2, true);
+	}
+	else
+	{
+		LOG("Wrong timerNum - no handler function defined! \n");
+	}
+
+	/* Set the alarm time */
+    uint64_t target = timer_hw->timerawl + delay_us;
+    timer_hw->alarm[timerNum] = (uint32_t) target;
+}
+
 static void alarm0_InterruptHandler(void) 
 {
     /* Clear the alarm irq */
     hw_clear_bits(&timer_hw->intr, 1u << 0);
 
-	/* Debouncing delay gives the button time to stabilize its' state. The below code handles a situation when the button is released 
-	   within the debouncing delay (150ms currently) - so basically in case of very very fast button press. Without this code, in case
-	   of such press, the falling edge (release of the button) would not be detected (since interrupts are disabled during debouncing 
-	   delay). This would result in the state getting stuck and not returning to STATE_OFF after button release as it should */
-    bool is_high = gpio_get(UpDown_ButtonInfo.gpio);
-	if(!is_high && !(UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL))
+	/* If the button is still high/low after debouncing delay, count it, otherwise it's treated as noise and ignored */
+	if((UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && gpio_get(UpDown_ButtonInfo.gpio)) ||
+	   (UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_FALL && !gpio_get(UpDown_ButtonInfo.gpio)))
 	{
-		LOG("BUTTON CHANGED TO LOW DURING DEBOUNCING DELAY - SETTING DETECTED EDGE TO FALL \n");
+		LOG("DEBOUNCED UP/DOWN PRESS/RELEASE \n");
 		UpDown_ButtonInfo.pending = true;
-		UpDown_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
-
-		(UpDown_ButtonInfo.gpio == BUTTON_DOWN) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
 	}
 	
 	/* Re-enable the interrupts*/
@@ -77,28 +100,34 @@ static void alarm1_InterruptHandler(void)
 
 }
 
-static void timerInit(uint32_t delay_us, uint8_t timerNum)
+static void alarm2_InterruptHandler(void) 
 {
-    hw_set_bits(&timer_hw->inte, 1u << timerNum);
+    /* Clear the alarm irq */
+    hw_clear_bits(&timer_hw->intr, 1u << 2);
 
-	if(timerNum == 0)
+	/* If the button is still high/low after debouncing delay, count it, otherwise it's treated as noise and ignored */
+	if(Limitter_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && gpio_get(Limitter_ButtonInfo.gpio))
 	{
-    	irq_set_exclusive_handler(TIMER_IRQ_0, alarm0_InterruptHandler);
-		irq_set_enabled(TIMER_IRQ_0, true);
-	}
-	else if(timerNum == 1)
-	{
-    	irq_set_exclusive_handler(TIMER_IRQ_1, alarm1_InterruptHandler);
-		irq_set_enabled(TIMER_IRQ_1, true);
+		LOG("DEBOUNCED LIMIT SWITCH PRESS \n");
+		Limitter_ButtonInfo.pending = true;
+
+		/* Set a timer for reaction to hitting the limit switch - which is turn off all button interrupts, reverse the motor
+			and after the below delay, reenable interrupts and stop the motor (switch release is never detected, it is implied is was released)  */
+		timerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
 	}
 	else
 	{
-		LOG("Wrong timerNum - no handler function defined! \n");
+		ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
+		ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
+		ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE;
+		ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE;
+		LOG("EI1 \n");
+		gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
+		gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
+		gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
+		gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
 	}
-
-	/* Set the alarm time */
-    uint64_t target = timer_hw->timerawl + delay_us;
-    timer_hw->alarm[timerNum] = (uint32_t) target;
+	
 }
 
 void buttons_callback(uint gpio, uint32_t events)
@@ -111,7 +140,6 @@ void buttons_callback(uint gpio, uint32_t events)
 		gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
-		UpDown_ButtonInfo.pending = true;
 		UpDown_ButtonInfo.gpio = gpio;
 		UpDown_ButtonInfo.edge = events;
 
@@ -130,13 +158,10 @@ void buttons_callback(uint gpio, uint32_t events)
 			gpio_set_irq_enabled(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 			gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
-			Limitter_ButtonInfo.pending = true;
 			Limitter_ButtonInfo.gpio = gpio;
 			Limitter_ButtonInfo.edge = events;
 
-			/* Set a timer for reaction to hitting the limit switch - which is turn off all button interrupts, reverse the motor
-				and after the below delay, reenable interrupts and stop the motor (switch release is never detected, it is implied is was released)  */
-			timerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+			timerInit(DEBOUNCING_DELAY_IN_US, 2);
 		}
 		else
 		{
