@@ -21,7 +21,10 @@ extern SemaphoreHandle_t buttonSemaphore;
 /* Function Declarations */
 void ButtonTask( void *pvParameters );
 static void buttons_callback(uint gpio, uint32_t events);
-static void alarm_irq(void);
-static void alarm_in_us(uint32_t delay_us);
+static void timerInit(uint32_t delay_us, uint8_t timerNum);
+static void alarm0_InterruptHandler(void);
+static void alarm1_InterruptHandler(void);
+static void alarm2_InterruptHandler(void);
+
 
 #endif /* BUTTONTASK_H */
