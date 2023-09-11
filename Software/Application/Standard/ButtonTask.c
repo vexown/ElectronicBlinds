@@ -66,17 +66,26 @@ static void alarm0_InterruptHandler(void)
     hw_clear_bits(&timer_hw->intr, 1u << 0);
 
 	/* If the button is still high/low after debouncing delay, count it, otherwise it's treated as noise and ignored */
-	if((UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && gpio_get(UpDown_ButtonInfo.gpio)) ||
-	   (UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_FALL && !gpio_get(UpDown_ButtonInfo.gpio)))
-	{
-		LOG("DEBOUNCED UP/DOWN PRESS/RELEASE \n");
+	bool GPIO_State = gpio_get(UpDown_ButtonInfo.gpio);
+	if(UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && GPIO_State)
+	{ /* Stable button press */
+		LOG("stable \n");
 		UpDown_ButtonInfo.pending = true;
+		/* set a timer for another cycle to see if the button is still pressed (this is repeated until it's released) */
+		timerInit(DEBOUNCING_DELAY_IN_US, 0);
 	}
-	
-	/* Re-enable the interrupts*/
-	LOG("EI \n");
-	gpio_set_irq_enabled_with_callback(BUTTON_DOWN, ExpctdEdges[0], true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
+	else if(!GPIO_State)
+	{ /* Button has been released (or it was noise)*/
+		LOG("released \n");
+		UpDown_ButtonInfo.pending = true;
+		UpDown_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+
+		/* Re-enable the interrupts*/
+		LOG("EI \n");
+		gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE, true, &buttons_callback);
+		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE, true);
+	}
+
 }
 
 static void alarm1_InterruptHandler(void) 
@@ -86,7 +95,24 @@ static void alarm1_InterruptHandler(void)
 	
 	/* It is assumed here, that when this timer goes off, the blinds have cleared the limit switch and are in the normal range of motion */
 	Limitter_ButtonInfo.pending = true;
-	Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+	if(gpio_get(Limitter_ButtonInfo.gpio))
+	{
+		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_RISE;
+		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
+		{
+			timerInit(TOP_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		}
+		else
+		{
+			timerInit(BOTTOM_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		}
+		
+	}
+	else
+	{
+		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+	}
+	
 	/* Re-enable the interrupts*/
 	ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
 	ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
@@ -113,7 +139,15 @@ static void alarm2_InterruptHandler(void)
 
 		/* Set a timer for reaction to hitting the limit switch - which is turn off all button interrupts, reverse the motor
 			and after the below delay, reenable interrupts and stop the motor (switch release is never detected, it is implied is was released)  */
-		timerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
+		{
+			timerInit(TOP_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		}
+		else
+		{
+			timerInit(BOTTOM_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
+		}
+		
 	}
 	else
 	{
@@ -140,11 +174,9 @@ void buttons_callback(uint gpio, uint32_t events)
 		gpio_set_irq_enabled_with_callback(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &buttons_callback);
 		gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
+		UpDown_ButtonInfo.pending = false;
 		UpDown_ButtonInfo.gpio = gpio;
 		UpDown_ButtonInfo.edge = events;
-
-		(gpio == BUTTON_DOWN && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[0] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE);
-		(gpio == BUTTON_UP && events == GPIO_IRQ_EDGE_RISE) ? (ExpctdEdges[1] = GPIO_IRQ_EDGE_FALL) : (ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE);
 
 		/* Set a timer for debouncing delay - during that time interrupts are disabled - no button presses detected */
 		timerInit(DEBOUNCING_DELAY_IN_US, 0);
@@ -158,6 +190,7 @@ void buttons_callback(uint gpio, uint32_t events)
 			gpio_set_irq_enabled(BUTTON_DOWN, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 			gpio_set_irq_enabled(BUTTON_UP, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
 
+			Limitter_ButtonInfo.pending = false;
 			Limitter_ButtonInfo.gpio = gpio;
 			Limitter_ButtonInfo.edge = events;
 
@@ -207,7 +240,7 @@ void ButtonTask( void *pvParameters )
 		   and limit switches shall have the priority to set the OFF State when limit is reached  */
 		if(Limitter_ButtonInfo.pending)
 		{
-			/* If button pressed: (falling edge)*/
+			/* If button released: (falling edge)*/
 			if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
 				switch (Limitter_ButtonInfo.gpio)
@@ -232,7 +265,7 @@ void ButtonTask( void *pvParameters )
 					default: break;
 				}
 			}
-			/* If button released: (rising edge)*/
+			/* If button pressed: (rising edge)*/
 			else if((Limitter_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
 			{
 				switch (Limitter_ButtonInfo.gpio)
@@ -265,7 +298,7 @@ void ButtonTask( void *pvParameters )
 		{
 			LOG("TL%d \n", TopLimitReached);
 			LOG("BL%d \n", BottomLimitReached);
-			/* If button pressed: (falling edge)*/
+			/* If button released: (falling edge)*/
 			if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_FALL) == GPIO_IRQ_EDGE_FALL)
 			{
 				switch (UpDown_ButtonInfo.gpio)
@@ -280,20 +313,18 @@ void ButtonTask( void *pvParameters )
 					default: break;
 				}
 			}
-			/* If button released: (rising edge)*/
+			/* If button pressed: (rising edge)*/
 			else if((UpDown_ButtonInfo.edge & GPIO_IRQ_EDGE_RISE) == GPIO_IRQ_EDGE_RISE)
 			{
 				switch (UpDown_ButtonInfo.gpio)
 				{
 					case BUTTON_DOWN:
-						LOG("DBP! \n");
 						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!BottomLimitReached))
 						{
 							MotorState_Requested = STATE_CLOCKWISE;
 						}
 						break;
 					case BUTTON_UP:
-						LOG("UBP! \n");
 						if((xSemaphoreGive(buttonSemaphore) == pdTRUE) && (!TopLimitReached))
 						{
 							MotorState_Requested = STATE_ANTICLOCKWISE;
