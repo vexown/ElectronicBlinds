@@ -45,11 +45,6 @@ static void timerInit(uint32_t delay_us, uint8_t timerNum)
     	irq_set_exclusive_handler(TIMER_IRQ_1, alarm1_InterruptHandler);
 		irq_set_enabled(TIMER_IRQ_1, true);
 	}
-	else if(timerNum == 2)
-	{
-		irq_set_exclusive_handler(TIMER_IRQ_2, alarm2_InterruptHandler);
-		irq_set_enabled(TIMER_IRQ_2, true);
-	}
 	else
 	{
 		LOG("Wrong timerNum - no handler function defined! \n");
@@ -67,6 +62,7 @@ static void alarm0_InterruptHandler(void)
 
 	/* If the button is still high/low after debouncing delay, count it, otherwise it's treated as noise and ignored */
 	bool GPIO_State = gpio_get(UpDown_ButtonInfo.gpio);
+	LOG("GPIO STATE = %d \n", GPIO_State);
 	if(UpDown_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && GPIO_State)
 	{ /* Stable button press */
 		LOG("stable \n");
@@ -93,52 +89,14 @@ static void alarm1_InterruptHandler(void)
     /* Clear the alarm irq */
     hw_clear_bits(&timer_hw->intr, 1u << 1);
 	
-	/* It is assumed here, that when this timer goes off, the blinds have cleared the limit switch and are in the normal range of motion */
-	Limitter_ButtonInfo.pending = true;
-	if(gpio_get(Limitter_ButtonInfo.gpio))
-	{
-		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_RISE;
-		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
-		{
-			timerInit(TOP_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
-		}
-		else
-		{
-			timerInit(BOTTOM_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
-		}
-		
-	}
-	else
-	{
-		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
-	}
-	
-	/* Re-enable the interrupts*/
-	ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
-	ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
-	ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE;
-	ExpctdEdges[3] = GPIO_IRQ_EDGE_RISE;
-	LOG("EI1 \n");
-	gpio_set_irq_enabled_with_callback(BUTTON_TOP_LIMIT, ExpctdEdges[2], true, &buttons_callback);
-	gpio_set_irq_enabled(BUTTON_BOTTOM_LIMIT, ExpctdEdges[3], true);
-	gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
-	gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
-
-}
-
-static void alarm2_InterruptHandler(void) 
-{
-    /* Clear the alarm irq */
-    hw_clear_bits(&timer_hw->intr, 1u << 2);
-
 	/* If the button is still high/low after debouncing delay, count it, otherwise it's treated as noise and ignored */
-	if(Limitter_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && gpio_get(Limitter_ButtonInfo.gpio))
-	{
-		LOG("DEBOUNCED LIMIT SWITCH PRESS \n");
+	bool GPIO_State = gpio_get(Limitter_ButtonInfo.gpio);
+	LOG("GPIO STATE = %d \n", GPIO_State);
+	if(Limitter_ButtonInfo.edge == GPIO_IRQ_EDGE_RISE && GPIO_State)
+	{ /* Stable button press */
+		LOG("stable \n");
 		Limitter_ButtonInfo.pending = true;
-
-		/* Set a timer for reaction to hitting the limit switch - which is turn off all button interrupts, reverse the motor
-			and after the below delay, reenable interrupts and stop the motor (switch release is never detected, it is implied is was released)  */
+		/* set a timer for another cycle to see if the button is still pressed (this is repeated until it's released) */
 		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
 		{
 			timerInit(TOP_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
@@ -147,10 +105,14 @@ static void alarm2_InterruptHandler(void)
 		{
 			timerInit(BOTTOM_LIMIT_SWITCH_REACTION_DURATION_IN_US, 1);
 		}
-		
 	}
-	else
-	{
+	else if(!GPIO_State)
+	{ /* Button has been released (or it was noise)*/
+		LOG("released \n");
+		Limitter_ButtonInfo.pending = true;
+		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+
+		/* Re-enable the interrupts*/
 		ExpctdEdges[0] = GPIO_IRQ_EDGE_RISE;
 		ExpctdEdges[1] = GPIO_IRQ_EDGE_RISE;
 		ExpctdEdges[2] = GPIO_IRQ_EDGE_RISE;
@@ -161,7 +123,7 @@ static void alarm2_InterruptHandler(void)
 		gpio_set_irq_enabled(BUTTON_DOWN, ExpctdEdges[0], true);
 		gpio_set_irq_enabled(BUTTON_UP, ExpctdEdges[1], true);
 	}
-	
+
 }
 
 void buttons_callback(uint gpio, uint32_t events)
@@ -194,7 +156,7 @@ void buttons_callback(uint gpio, uint32_t events)
 			Limitter_ButtonInfo.gpio = gpio;
 			Limitter_ButtonInfo.edge = events;
 
-			timerInit(DEBOUNCING_DELAY_IN_US, 2);
+			timerInit(DEBOUNCING_DELAY_IN_US_LIMITTER, 1);
 		}
 		else
 		{
