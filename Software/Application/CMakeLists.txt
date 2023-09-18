@@ -19,6 +19,6 @@ set(CMAKE_CXX_STANDARD 17)
 message("########## pico_sdk_init macro - start ##########")
 pico_sdk_init()
 
-add_subdirectory(Standard)
+add_subdirectory(SwComponents)
 
 message("########## TOP CMakeLists.txt - end ##########")
