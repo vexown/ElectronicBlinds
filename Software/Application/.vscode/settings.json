@@ -29,6 +29,7 @@
         "binary_info.h": "c",
         "stdlib.h": "c",
         "motorcontrollertask.h": "c",
-        "gpio.h": "c"
+        "gpio.h": "c",
+        "automaticcontroltask.h": "c"
     }
 }
