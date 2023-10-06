@@ -66,8 +66,8 @@ void vApplicationTickHook(void);
 /*--------------- GLOBAL VARIABLE DEFINITIONS ---------------*/
 bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
 
-/*--------------- LOCAL FUNCTION DEFINITIONS ---------------*/
 
+/*---------------- GLOBAL FUNCTION DEFINITIONS ----------------------*/
 void main(void)
 {
     /* Startup delay - wait until the whole system is stabilized before starting */
@@ -108,7 +108,7 @@ void main(void)
 	for( ;; );
 }
 
-/*-----------------------------------------------------------*/
+/*--------------- LOCAL FUNCTION DEFINITIONS ---------------*/
 
 void getInitialPinStates(void)
 {

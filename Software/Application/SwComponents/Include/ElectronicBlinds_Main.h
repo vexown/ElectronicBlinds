@@ -2,13 +2,22 @@
 #define ELECTRONICBLINDS_MAIN_H
 
 /*--------------- MACROS ---------------*/
+
+/* Prints control */
+#define PRINTS_ENABLED 0 //1 - prints enabled, 0 - prints disabled
+
+#if(PRINTS_ENABLED == 1)
+#define LOG(...) printf(__VA_ARGS__)
+#else
+#define LOG(...) 
+#endif
+
 /* Priorities for the tasks */
 #define MOTOR_CONTROLLER_TASK_PRIORITY		(tskIDLE_PRIORITY + 1)
 #define	BUTTON_TASK_PRIORITY				(tskIDLE_PRIORITY + 2)
 #define AUTOMATIC_CONTROL_TASK_PRIORITY     (tskIDLE_PRIORITY + 3)
 
 /* Task periods (ms) */
-
 #define BUTTON_TASK_PERIOD					(100)
 #define MOTOR_CONTROLLER_TASK_PERIOD		(100)
 #define AUTOMATIC_CONTROL_TASK_PERIOD       (50000)
@@ -34,8 +43,7 @@
 /* Timing macros */
 #define DEBOUNCING_DELAY_IN_US 100000U //100ms
 #define DEBOUNCING_DELAY_IN_US_LIMITTER 10000U //10ms
-#define TOP_LIMIT_SWITCH_REACTION_DURATION_IN_US 1000000 //1000ms
-#define BOTTOM_LIMIT_SWITCH_REACTION_DURATION_IN_US 200000 //200ms
+#define LIMIT_SWITCH_REACTION_DURATION_IN_US 100000 //200ms
 
 /*--------------- GLOBAL VARIABLES DECLARATION (extern) ---------------*/
 extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
