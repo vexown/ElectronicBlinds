@@ -25,12 +25,7 @@
  * 1 tab == 4 spaces!
  *******************************************************************************/
 
-/********************************* HARDWARE ************************************/
-/* MPU6050 - world’s first integrated 6-axis MotionTracking device that combines
- * a 3-axis gyroscope, 3-axis accelerometer, and a Digital Motion Processor™ (DMP) 
- * Datasheet: https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf
- * 
- *******************************************************************************/
+/*---------------- INCLUDES ----------------------*/
 
 /* Standard includes. */
 #include <stdio.h>
@@ -56,83 +51,52 @@
 #include "DS1307.h"
 #include "I2C_Driver.h"
 
+/*---------------- LOCAL FUNCTION DECLARATIONS ----------------------*/
+
 /* Hardware setup function */
-static void prvSetupHardware( void );
+void prvSetupHardware(void);
+void getInitialPinStates(void);
 
 /* Prototypes for the standard FreeRTOS callback/hook functions implemented within this file. */
-void vApplicationMallocFailedHook( void );
-void vApplicationIdleHook( void );
-void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName );
-void vApplicationTickHook( void );
+void vApplicationMallocFailedHook(void);
+void vApplicationIdleHook(void);
+void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName );
+void vApplicationTickHook(void);
 
-/*----------------FUNCTION DECLARATION----------------------*/
-
-
-/*---------------GLOBAL VARIABLES DECLARATION---------------*/
+/*--------------- GLOBAL VARIABLE DEFINITIONS ---------------*/
 bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
 
-void main( void )
+
+/*---------------- GLOBAL FUNCTION DEFINITIONS ----------------------*/
+void main(void)
 {
     /* Startup delay - wait until the whole system is stabilized before starting */
     sleep_ms(4000);
 
-    /* Configure the Raspberry Pico hardware for blinky */
+    /* Configure the Raspberry Pico hardware */
     prvSetupHardware();
-
-    /* Get initial pin states: */
-	uint8_t consistentReads;
-	/* Read each pin multiple times to get a stable result */
-	for(uint8_t i = 0; i < 100; i++ ){ 
-		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
-	}
-	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0;
-	consistentReads = 0;
-	for(uint8_t i = 0; i < 100; i++ ){
-		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
-	}
-	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
-	consistentReads = 0;
-	for(uint8_t i = 0; i < 100; i++ ){
-		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
-	}
-	buttonTopLimit_InitState = (consistentReads >= 70) ? 1 : 0;
-	consistentReads = 0;
-	for(uint8_t i = 0; i < 100; i++ ){
-		gpio_get(BUTTON_BOTTOM_LIMIT) ? consistentReads++ : 0;
-	}
-	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+    getInitialPinStates();
 
 	/* Reset the I2C0 controller to get a fresh clear state */
 	Reset_I2C0();
-    /* Initial Configuration of the I2C0 */
-    I2C_Initialize(I2C_FAST_MODE);
 
+    /* Configure of the I2C0 module */
+    I2C_Initialize(I2C_FAST_MODE);
 	(void)setupPinsI2C0();
+
+    /* Configure the DS1307 (RTC) module */
 	(void)Disable_DS1307_SquareWaveOutput();
 	(void)Enable_DS1307_Oscillator();
-#if (SPECIAL_BUILD_FOR_SETTING_DATE == 1)
+#if (SPECIAL_BUILD_FOR_SETTING_DATE == 1) //this code is activated with an additional build definition when date update is needed
 	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ );
 #endif
 
-/*
-    while (1) 
-    {
-		printf("Going into I2C reg read... \n");
-		for(int i = 0; i<=7; i++)
-		{
-			printf("Read reg %x = 0x%x \n", i, I2C_Register_Read(i));
-		}
-		sleep_ms(1000);
-        printf("/n");
-    }
-*/
-
-	/* Create the tasks */
+	/* Create the OS tasks */
 	xTaskCreate( MotorControllerTask,"MotorControllerTask",configMINIMAL_STACK_SIZE,NULL,MOTOR_CONTROLLER_TASK_PRIORITY, NULL );								
 	xTaskCreate( ButtonTask, "ButtonTask", configMINIMAL_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL );
     xTaskCreate( AutomaticControlTask, "AutomaticControlTask", configMINIMAL_STACK_SIZE, NULL, AUTOMATIC_CONTROL_TASK_PRIORITY, NULL );
 
-	/* Start the tasks and timer running. */
+	/* Start the FreeRTOS scheduler and system tick  */
 	vTaskStartScheduler();
 
 	/* If all is well, the scheduler will now be running, and the following
@@ -144,9 +108,40 @@ void main( void )
 	for( ;; );
 }
 
+/*--------------- LOCAL FUNCTION DEFINITIONS ---------------*/
+
+void getInitialPinStates(void)
+{
+    uint8_t consistentReads;
+
+	/* Read each pin 100 times to get a stable result: */
+	for(uint8_t i = 0; i < 100; i++ ){ 
+		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
+	}
+	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0; //if 70% of the reads were 1s, the initial state is 1 
+
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
+	}
+	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
+
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
+	}
+	buttonTopLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+
+	consistentReads = 0;
+	for(uint8_t i = 0; i < 100; i++ ){
+		gpio_get(BUTTON_BOTTOM_LIMIT) ? consistentReads++ : 0;
+	}
+	buttonBottomLimit_InitState = (consistentReads >= 70) ? 1 : 0;
+}
+
 /*-----------------------------------------------------------*/
 
-static void prvSetupHardware( void )
+void prvSetupHardware(void)
 {
     stdio_init_all();
 
@@ -197,7 +192,7 @@ static void prvSetupHardware( void )
 }
 /*-----------------------------------------------------------*/
 
-void vApplicationMallocFailedHook( void )
+void vApplicationMallocFailedHook(void)
 {
     /* Called if a call to pvPortMalloc() fails because there is insufficient
     free memory available in the FreeRTOS heap.  pvPortMalloc() is called
@@ -212,8 +207,8 @@ void vApplicationMallocFailedHook( void )
 
 void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName )
 {
-    ( void ) pcTaskName;
-    ( void ) pxTask;
+    (void) pcTaskName;
+    (void) pxTask;
 
     /* Run time stack overflow checking is performed if
     configCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2.  This hook
@@ -224,7 +219,7 @@ void vApplicationStackOverflowHook( TaskHandle_t pxTask, char *pcTaskName )
 }
 /*-----------------------------------------------------------*/
 
-void vApplicationIdleHook( void )
+void vApplicationIdleHook(void)
 {
     volatile size_t xFreeHeapSpace;
 
@@ -238,21 +233,15 @@ void vApplicationIdleHook( void )
     xFreeHeapSpace = xPortGetFreeHeapSize();
 
     /* Remove compiler warning about xFreeHeapSpace being set but never used. */
-    ( void ) xFreeHeapSpace;
+    (void) xFreeHeapSpace;
 }
 /*-----------------------------------------------------------*/
 
-void vApplicationTickHook( void )
+void vApplicationTickHook(void)
 {
+    /* The vApplicationTickHook function is a user-defined callback function in FreeRTOS 
+    that gets called by the FreeRTOS kernel each time a tick interrupt occurs */
 
+    /* Do nothing for now */
 
 }
-/** 
- * 	TODO:
- * 		- Add if pressed for 2,3 sec goes all the way up/down on its own (add top/bottom edge detection first)
- * 		- Add OLED screen
- * 		- Add brightness level detection
- * 		- Add RTC and auto raise/lower at sunrise/sunset (maybe not necessary with brightness level detection?)
- * 		- Press both buttons to activate/deactivate auto mode
- * 		- Add bluetooth control? (maybe too much lol)
-*/

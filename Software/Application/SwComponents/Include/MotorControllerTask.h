@@ -14,6 +14,9 @@ typedef enum
 
 /* Function Declarations */
 void MotorControllerTask( void *pvParameters );
+void stateOFF(void);
+void stateAnticlockwise(void);
+void stateClockwise(void);
 
 #endif /* MOTORCONTROLLERTASK_H */
 

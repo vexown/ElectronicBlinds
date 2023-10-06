@@ -1,10 +1,10 @@
 
 message("########## Application/Standard CMakeLists.txt - start ##########")
 add_executable(ElectronicBlinds_Main
-        ElectronicBlinds_Main.c
-        ButtonTask.c
-        MotorControllerTask.c
-        AutomaticControlTask.c
+        Source/ElectronicBlinds_Main.c
+        Source/ButtonTask.c
+        Source/MotorControllerTask.c
+        Source/AutomaticControlTask.c
         )
 
 if (DEFINED CMAKE_SPECIAL_BUILD_FOR_SETTING_DATE)
@@ -12,7 +12,7 @@ if (DEFINED CMAKE_SPECIAL_BUILD_FOR_SETTING_DATE)
 endif ()
 
 target_include_directories(ElectronicBlinds_Main PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/Include
         ${CMAKE_CURRENT_LIST_DIR}/../../Common/include
         ${CMAKE_CURRENT_LIST_DIR}/../../Pico_DS1307_HAL/DS1307/include)
 
