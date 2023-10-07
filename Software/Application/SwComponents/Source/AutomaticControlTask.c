@@ -173,8 +173,9 @@ void AutomaticControlTask( void *pvParameters )
         /* Adjust hour for DST if needed */
         if(isDST(year, month, day))
         {
-            sunrise += 1.0;
-            sunset += 1.0;
+            /* We SUBSTRACT an hour because time is unadjusted to DST, so during DST period it's early one hour */
+            sunrise -= 1.0; 
+            sunset -= 1.0;
         }
         
         LOG("sunrise = %lf \n", sunrise);
