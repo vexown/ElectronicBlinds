@@ -169,6 +169,7 @@ void AutomaticControlTask( void *pvParameters )
 
         double sunrise = CalculateSunrise(LATITUDE_SIEROSZEWICE_NOWA_10, dayOfYear);
         double sunset = CalculateSunset(LATITUDE_SIEROSZEWICE_NOWA_10, dayOfYear);
+        sunset += 0.5; /* Offset sunset time by 0.5h, coz the calculation is a bit early */
 
         /* Adjust hour for DST if needed */
         if(isDST(year, month, day))
