@@ -189,7 +189,14 @@ void TimerHandler_LimitSwitches(void)
 		LOG("button stable \n");
 		Limitter_ButtonInfo.pending = true;
 		/* Set a timer for another cycle to see if the button is still pressed (this is repeated until it's released) */
-		TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, TIMER_LIMITSWITCHES);
+		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
+		{
+			TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US * 10U, TIMER_LIMITSWITCHES);
+		}
+		else
+		{
+			TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, TIMER_LIMITSWITCHES);
+		}	
 	}
 	else if(!GPIO_State)
 	{ /* Button has been released (or it was noise)*/

@@ -43,7 +43,7 @@
 /* Timing macros */
 #define DEBOUNCING_DELAY_IN_US 100000U //100ms
 #define DEBOUNCING_DELAY_IN_US_LIMITTER 10000U //10ms
-#define LIMIT_SWITCH_REACTION_DURATION_IN_US 100000 //200ms
+#define LIMIT_SWITCH_REACTION_DURATION_IN_US 100000 //100ms
 
 /*--------------- GLOBAL VARIABLES DECLARATION (extern) ---------------*/
 extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
