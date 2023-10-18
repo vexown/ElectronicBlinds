@@ -157,8 +157,8 @@ void AutomaticControlTask( void *pvParameters )
         /* Read current hour and minute (warning - will be incorrect during DST since it's adjusted at sunrise/sunset time) */
         uint8_t hour = I2C_Register_Read(DS1307_REG_ADDR_HOURS);
         uint8_t minute = I2C_Register_Read(DS1307_REG_ADDR_MINUTES);
-        /* Convert hour and minute to one double value - example: hour = 0x15, minute = 0x53 would be converted to time = 15.53 */
-        double time = ConvertBCD(hour, BCD_TO_DEC) + (ConvertBCD(minute, BCD_TO_DEC)/100.0);
+        /* Convert hour and minute to one double value - example: hour = 0x15, minute = 0x53 would be converted to time = 15.88*/
+        double time = ConvertBCD(hour, BCD_TO_DEC) + (ConvertBCD(minute, BCD_TO_DEC)/60.0);
         /* Check if the blinds are currently closed (this is stored in RTC's RAM so it persists as long as RTC has power) */
         uint8_t isClosed = I2C_Register_Read(DS1307_REG_ADDR_IS_CLOSED);
 

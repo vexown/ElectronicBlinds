@@ -4,7 +4,10 @@
 /*--------------- MACROS ---------------*/
 
 /* Prints control */
+/* BE VERY CAREFUL WHEN ENABLING PRINTS, SYSTEM SOMETIMES FREEZES AND LOCKS UP! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 #define PRINTS_ENABLED 0 //1 - prints enabled, 0 - prints disabled
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 #if(PRINTS_ENABLED == 1)
 #define LOG(...) printf(__VA_ARGS__)
