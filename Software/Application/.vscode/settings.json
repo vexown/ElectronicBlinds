@@ -30,6 +30,7 @@
         "stdlib.h": "c",
         "motorcontrollertask.h": "c",
         "gpio.h": "c",
-        "automaticcontroltask.h": "c"
+        "automaticcontroltask.h": "c",
+        "cmath": "c"
     }
 }

@@ -4,7 +4,6 @@
 
 /* Standard includes. */
 #include <stdio.h>
-#include <math.h>
 
 /* Kernel includes. */
 #include "FreeRTOS.h"
@@ -119,26 +118,60 @@ uint32_t CalculateDayOfYear(uint32_t yearBCD, uint32_t monthBCD, uint32_t dayBCD
     return currentDay;
 }
 
-/* Function to calculate the end of Nautical Twilight during Dawn  */
-double CalculateSunrise(double latitude, int dayOfYear) 
-{
-    double latitudeRad = (latitude * M_PI / 180.0);
-    double solarDeclination = -23.44 * (M_PI / 180.0) * cos(2.0 * M_PI * (dayOfYear + 10) / 365.0);
-    double hourAngle = acos(-tan(latitudeRad) * tan(solarDeclination));
-    double sunriseTime = 12.0 - (hourAngle * 180.0 / M_PI) / 15.0;
-    
-    return sunriseTime;
-}
+/* Use https://gml.noaa.gov/grad/solcalc/ and the excel doc at: https://gml.noaa.gov/grad/solcalc/calcdetails.html 
+   for reference/calibration of your sunset/sunrise functions! */
 
-/* Function to calculate the beginning of Nautical Twilight during Dusk  */
-double CalculateSunset(double latitude, int dayOfYear) 
+/* Function to calculate the sunrise and sunset times based on NOAA solar calculator */
+void CalculateSunriseSunset(double latitude, double longitude, int dayOfYear, int timeZone, double* sunrise, double* sunset) 
 {
-    double latitudeRad = (latitude * M_PI / 180.0);
-    double solarDeclination = -23.44 * (M_PI / 180.0) * cos(2.0 * M_PI * (dayOfYear + 10) / 365.0);
-    double hourAngle = acos(-tan(latitudeRad) * tan(solarDeclination));
-    double sunsetTime = 12.0 + (hourAngle * 180.0 / M_PI) / 15.0;
+    // Define the time (12:00:00)
+    double Time = 0.5; 
+    // Calculate the date
+    int Date = 44927 + dayOfYear;
+    // Calculate the Julian Day
+    double JulianDay = Date + 2415018.5 + Time - timeZone / 24;
+    // Calculate the Julian Century
+    double JulianCentury = (JulianDay - 2451545) / 36525;
+    // Calculate the eccentricity of Earth's orbit
+    double EccentEarthOrbit = 0.016708634 - JulianCentury * (0.000042037 + 0.0000001267 * JulianCentury);
+    // Calculate the geometric mean longitude of the Sun (in degrees)
+    double GeomMeanLongSun = fmod(280.46646 + JulianCentury * (36000.76983 + JulianCentury * 0.0003032), 360); 
+    // Calculate the geometric mean anomaly of the Sun (in degrees)
+    double GeomMeanAnomSun = 357.52911 + JulianCentury * (35999.05029 - 0.0001537 * JulianCentury); 
+    // Calculate the mean obliquity of the ecliptic (in degrees)
+    double MeanObliqEcliptic = 23 + (26 + ((21.448 - JulianCentury * (46.815 + JulianCentury * (0.00059 - JulianCentury * 0.001813)))) / 60) / 60; 
+    // Calculate the corrected obliquity (in degrees)
+    double ObligCorr = MeanObliqEcliptic + 0.00256 * cos(degToRad(125.04 - 1934.136 * JulianCentury)); 
+    // Calculate the variable y
+    double var_y = tan(degToRad(ObligCorr / 2)) * tan(degToRad(ObligCorr / 2));
+    // Calculate the equation of time (in minutes)
+    double EqOfTime = 4 * radToDeg(var_y * sin(2 * degToRad(GeomMeanLongSun))
+                - 2 * EccentEarthOrbit * sin(degToRad(GeomMeanAnomSun))
+                + 4 * EccentEarthOrbit * var_y * sin(degToRad(GeomMeanAnomSun)) * cos(2 * degToRad(GeomMeanLongSun))
+                - 0.5 * var_y * var_y * sin(4 * degToRad(GeomMeanLongSun))
+                - 1.25 * EccentEarthOrbit * EccentEarthOrbit * sin(2 * degToRad(GeomMeanAnomSun))); 
 
-    return sunsetTime;
+    // Calculate the solar noon (in LST)
+    double SolarNoon = (720 - 4 * longitude - EqOfTime + timeZone * 60) / 1440; 
+    // Calculate the Sun's equation of center  
+    double SunEqOfCtr = sin(degToRad(GeomMeanAnomSun)) * (1.914602 - JulianCentury * (0.004817 + 0.000014 * JulianCentury))
+                        + sin(degToRad(2 * GeomMeanAnomSun)) * (0.019993 - 0.000101 * JulianCentury)
+                        + sin(degToRad(3 * GeomMeanAnomSun)) * 0.000289;  
+    // Calculate the Sun's true longitude
+    double SunTrueLong = GeomMeanLongSun + SunEqOfCtr;
+    // Calculate the Sun's apparent longitude (in degrees)
+    double SunAppLong = SunTrueLong - 0.00569 - 0.00478 * sin(degToRad(125.04 - 1934.136 * JulianCentury)); 
+    // Calculate the Sun's declination
+    double sunDeclin = radToDeg(asin(sin(degToRad(ObligCorr)) * sin(degToRad(SunAppLong))));
+    // Calculate the hour angle for sunrise (in degrees)
+    double HA_Sunrise = radToDeg(acos(cos(degToRad(90.833)) /
+                        (cos(degToRad(latitude)) * cos(degToRad(sunDeclin)))
+                        - tan(degToRad(latitude)) * tan(degToRad(sunDeclin)))); 
+
+    // Calculate the sunrise time (in hours)
+    *sunrise = ((SolarNoon * 1440 - HA_Sunrise * 4) / 1440) * 24;
+    // Calculate the sunset time (in hours)
+    *sunset = ((SolarNoon * 1440 + HA_Sunrise * 4) / 1440) * 24;
 }
 
 /*---------------- GLOBAL FUNCTION DEFINITIONS ----------------------*/
@@ -167,9 +200,8 @@ void AutomaticControlTask( void *pvParameters )
         uint8_t year = I2C_Register_Read(DS1307_REG_ADDR_YEARS);
         uint32_t dayOfYear = CalculateDayOfYear(year, month, day);
 
-        double sunrise = CalculateSunrise(LATITUDE_SIEROSZEWICE_NOWA_10, dayOfYear);
-        double sunset = CalculateSunset(LATITUDE_SIEROSZEWICE_NOWA_10, dayOfYear);
-        sunset += 0.5; /* Offset sunset time by 0.5h, coz the calculation is a bit early */
+        double sunrise, sunset;
+        CalculateSunriseSunset(LATITUDE_SIEROSZEWICE_NOWA_10, LONGITUDE_SIEROSZEWICE_NOWA_10, dayOfYear, TIME_ZONE_PLUS_TO_E, &sunrise, &sunset);
 
         /* Adjust hour for DST if needed */
         if(isDST(year, month, day))
