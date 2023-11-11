@@ -49,6 +49,6 @@
 #define LIMIT_SWITCH_REACTION_DURATION_IN_US 100000 //100ms
 
 /*--------------- GLOBAL VARIABLES DECLARATION (extern) ---------------*/
-extern bool buttonDown_InitState, buttonUp_InitState, buttonTopLimit_InitState, buttonBottomLimit_InitState;
+extern bool buttonTopLimit_InitState, buttonBottomLimit_InitState;
 
 #endif /* ELECTRONICBLINDS_MAIN_H */

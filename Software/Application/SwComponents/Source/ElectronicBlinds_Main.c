@@ -114,18 +114,6 @@ void getInitialPinStates(void)
 {
     uint8_t consistentReads;
 
-	/* Read each pin 100 times to get a stable result: */
-	for(uint8_t i = 0; i < 100; i++ ){ 
-		gpio_get(BUTTON_DOWN) ? consistentReads++ : 0;
-	}
-	buttonDown_InitState = (consistentReads >= 70) ? 1 : 0; //if 70% of the reads were 1s, the initial state is 1 
-
-	consistentReads = 0;
-	for(uint8_t i = 0; i < 100; i++ ){
-		gpio_get(BUTTON_UP) ? consistentReads++ : 0;
-	}
-	buttonUp_InitState = (consistentReads >= 70) ? 1 : 0;
-
 	consistentReads = 0;
 	for(uint8_t i = 0; i < 100; i++ ){
 		gpio_get(BUTTON_TOP_LIMIT) ? consistentReads++ : 0;
