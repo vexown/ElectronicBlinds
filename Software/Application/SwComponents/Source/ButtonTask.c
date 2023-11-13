@@ -56,6 +56,7 @@ MotorState_t MotorState_Requested = STATE_OFF;
 SemaphoreHandle_t ButtonSemaphore;
 ButtonInfo_t UpDown_ButtonInfo, Limitter_ButtonInfo;
 ExpectedEdge_t ExpctdEdges;
+uint32_t Hysteresis;
 
 /*---------------- LOCAL FUNCTION DECLARATIONS ----------------------*/
 
@@ -191,33 +192,54 @@ void TimerHandler_LimitSwitches(void)
 		/* Set a timer for another cycle to see if the button is still pressed (this is repeated until it's released) */
 		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT)
 		{
-			gpio_put(PICO_DEFAULT_LED_PIN, 1);
+			Hysteresis = 10;
 			TopLimitReached = true;
 			TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, TIMER_LIMITSWITCHES);
 		}
 		else
 		{
-			gpio_put(PICO_DEFAULT_LED_PIN, 0);
+			Hysteresis = 1;
 			BottomLimitReached = true;
 			TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, TIMER_LIMITSWITCHES);
 		}	
 	}
 	else
 	{ /* Button has been released (or it was noise)*/
-		LOG("button released \n");
-		if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT) TopLimitReached = false; else BottomLimitReached = false;
-		
-		Limitter_ButtonInfo.pending = true;
-		Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
-
-		/* Re-enable the interrupts - assume all buttons/switches are released*/
-		ExpctdEdges.ButtonDown = GPIO_IRQ_EDGE_RISE;
-		ExpctdEdges.ButtonUp = GPIO_IRQ_EDGE_RISE;
-		ExpctdEdges.TopLimitSwitch = GPIO_IRQ_EDGE_RISE;
-		ExpctdEdges.BottomLimitSwitch = GPIO_IRQ_EDGE_RISE;
-		EnableAllInterrupts();
+		if(Hysteresis > 0) /* Delay the system response to releasing the limit switches */
+		{
+			Hysteresis--;
+			if(Hysteresis == 0)
+			{
+				if(Limitter_ButtonInfo.gpio == BUTTON_TOP_LIMIT) TopLimitReached = false; else BottomLimitReached = false;
+				
+				Limitter_ButtonInfo.pending = true;
+				Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+				/* Re-enable the interrupts - assume all buttons/switches are released*/
+				ExpctdEdges.ButtonDown = GPIO_IRQ_EDGE_RISE;
+				ExpctdEdges.ButtonUp = GPIO_IRQ_EDGE_RISE;
+				ExpctdEdges.TopLimitSwitch = GPIO_IRQ_EDGE_RISE;
+				ExpctdEdges.BottomLimitSwitch = GPIO_IRQ_EDGE_RISE;
+				EnableAllInterrupts();
+			}
+			else
+			{
+				Limitter_ButtonInfo.pending = true;
+				Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_RISE;
+				TimerInit(LIMIT_SWITCH_REACTION_DURATION_IN_US, TIMER_LIMITSWITCHES);
+			}
+		}
+		else /* Hysteresis == 0 */
+		{
+			Limitter_ButtonInfo.pending = true;
+			Limitter_ButtonInfo.edge = GPIO_IRQ_EDGE_FALL;
+			/* Re-enable the interrupts - assume all buttons/switches are released*/
+			ExpctdEdges.ButtonDown = GPIO_IRQ_EDGE_RISE;
+			ExpctdEdges.ButtonUp = GPIO_IRQ_EDGE_RISE;
+			ExpctdEdges.TopLimitSwitch = GPIO_IRQ_EDGE_RISE;
+			ExpctdEdges.BottomLimitSwitch = GPIO_IRQ_EDGE_RISE;
+			EnableAllInterrupts();
+		}
 	}
-
 }
 
 void ButtonsInterruptCallback(uint gpio, uint32_t events)
