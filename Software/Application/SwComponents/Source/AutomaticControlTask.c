@@ -120,7 +120,7 @@ uint32_t CalculateDayOfYear(uint32_t yearBCD, uint32_t monthBCD, uint32_t dayBCD
 
 /* Use https://gml.noaa.gov/grad/solcalc/ and the excel doc at: https://gml.noaa.gov/grad/solcalc/calcdetails.html 
    for reference/calibration of your sunset/sunrise functions! */
-
+/* The calculation will be accurate for DST time of the given time zone (Poland is E(east) + 2) */
 /* Function to calculate the sunrise and sunset times based on NOAA solar calculator */
 void CalculateSunriseSunset(double latitude, double longitude, int dayOfYear, int timeZone, double* sunrise, double* sunset) 
 {
@@ -203,12 +203,11 @@ void AutomaticControlTask( void *pvParameters )
         double sunrise, sunset;
         CalculateSunriseSunset(LATITUDE_SIEROSZEWICE_NOWA_10, LONGITUDE_SIEROSZEWICE_NOWA_10, dayOfYear, TIME_ZONE_PLUS_TO_E, &sunrise, &sunset);
 
-        /* Adjust hour for DST if needed */
-        if(isDST(year, month, day))
+        /* Sunrise/sunset times are calculated according to DST time, so to compensate during non-DST period, substract an hour */
+        if(isDST(year, month, day) == false)
         {
-            /* We add 1 hour if DST is active */
-            sunrise += 1.0; 
-            sunset += 1.0;
+            sunrise -= 1.0; 
+            sunset -= 1.0;
         }
         
         LOG("sunrise = %lf \n", sunrise);

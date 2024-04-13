@@ -19,7 +19,7 @@
 
 #define LATITUDE_SIEROSZEWICE_NOWA_10   (51.635799) //in degrees
 #define LONGITUDE_SIEROSZEWICE_NOWA_10   (17.966808) //in degrees
-#define TIME_ZONE_PLUS_TO_E (1)
+#define TIME_ZONE_PLUS_TO_E (2)
 
 #define degToRad(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
 #define radToDeg(angleInRadians) ((angleInRadians) * 180.0 / M_PI)
