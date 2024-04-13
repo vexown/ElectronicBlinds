@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "Warning - you're about to build and flash an image that will set the RTC to the build time. Press any key to proceed, otherwise close this terminal"
+echo "Be careful to flash the NON-DST time for this program to work properly"
 read -n 1 -s 
 
 echo "Building all components with CMake"

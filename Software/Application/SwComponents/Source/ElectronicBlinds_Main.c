@@ -87,8 +87,11 @@ void main(void)
     /* Configure the DS1307 (RTC) module */
 	(void)Disable_DS1307_SquareWaveOutput();
 	(void)Enable_DS1307_Oscillator();
-#if (SPECIAL_BUILD_FOR_SETTING_DATE == 1) //this code is activated with an additional build definition when date update is needed
-	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ );
+
+    /* this code is activated with an additional build definition when date update is needed */
+    /* be careful to flash the NON-DST time for this program to work properly */
+#if (SPECIAL_BUILD_FOR_SETTING_DATE == 1)
+	(void)SetCurrentDate((const char*)__DATE__, (const char*)__TIME__ ); 
 #endif
 
 	/* Create the OS tasks */
