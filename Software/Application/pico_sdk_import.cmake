@@ -7,17 +7,8 @@
 # This can be dropped into an external project to help locate this SDK
 # It should be include()ed prior to project()
 
-# Set the PICO_SDK_PATH variable if it's not yet set and if it exists as a env variable:
-if (DEFINED ENV{PICO_SDK_PATH} AND (NOT PICO_SDK_PATH))
-    set(PICO_SDK_PATH $ENV{PICO_SDK_PATH})
-    message("Using PICO_SDK_PATH from environment ('${PICO_SDK_PATH}')")
-endif ()
-
-# if the PICO_SDK_PATH environment variable is not set, the user could set it manually adding a path variable when running 
-# the cmake configuration command (the usual is "cmake .." but in this case it would be cmake "-DPICO_SDK_PATH=/path/to/sdk .. ")
-# This is then cached here. CACHE option causes the variable to be stored in the CMake cache. 
-# The CMake cache is a file that stores the values of CMake variables so that they can be reused between runs of CMake.
-set(PICO_SDK_PATH "${PICO_SDK_PATH}" CACHE PATH "Path to the Raspberry Pi Pico SDK" FORCE)
+# Force PICO_SDK_PATH to point to the local pico-sdk submodule
+set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/../pico-sdk" CACHE PATH "Path to the Raspberry Pi Pico SDK" FORCE)
 
 # This command is modifying the value of the PICO_SDK_PATH variable by setting it to the absolute path of the file path specified in the input
 get_filename_component(PICO_SDK_PATH "${PICO_SDK_PATH}" REALPATH BASE_DIR "${CMAKE_BINARY_DIR}")
