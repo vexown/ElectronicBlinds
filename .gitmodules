@@ -1,3 +1,6 @@
 [submodule "Software/Pico_DS1307_HAL"]
 	path = Software/Pico_DS1307_HAL
 	url = https://github.com/vexown/Pico_DS1307_HAL.git
+[submodule "Software/pico-sdk"]
+	path = Software/pico-sdk
+	url = git@github.com:raspberrypi/pico-sdk.git
