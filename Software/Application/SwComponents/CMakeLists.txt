@@ -7,7 +7,7 @@ add_executable(ElectronicBlinds_Main
         Source/AutomaticControlTask.c
         )
 
-if (DEFINED CMAKE_SPECIAL_BUILD_FOR_SETTING_DATE)
+if (SPECIAL_BUILD_FOR_SETTING_DATE)
         add_compile_definitions(SPECIAL_BUILD_FOR_SETTING_DATE=1)
 endif ()
 

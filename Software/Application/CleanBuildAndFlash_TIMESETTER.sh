@@ -18,7 +18,7 @@ fi
 #configure build directory
 echo Configuring the build directory...
 cd build
-cmake -DCMAKE_SPECIAL_BUILD_FOR_SETTING_DATE=1 ..
+cmake -DSPECIAL_BUILD_FOR_SETTING_DATE=1 ..
 
 #build the project
 echo Building...
